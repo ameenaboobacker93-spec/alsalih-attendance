@@ -13,10 +13,9 @@ export default function Portal() {
   const { branchCode } = useParams();
   const navigate = useNavigate();
   const { branches, setSelectedBranch } = useBranch();
-  const { showToast, isManager, login, logout } = useApp();
+  const { showToast, isManager, login, logout, theme, toggleTheme } = useApp();
   const [branch, setBranch] = useState(null);
   const [activeTab, setActiveTab] = useState('terminal');
-  const [swipeDir, setSwipeDir] = useState(null);
   const [staffList, setStaffList] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -27,60 +26,6 @@ export default function Portal() {
   const handleRefresh = useCallback(async () => {
     setRefreshKey(k => k + 1);
   }, []);
-
-  // ── Swipe to switch tabs (native passive listeners — no scroll blocking) ──
-  const touchSwipeRef = useRef({ startX: 0, startY: 0 });
-  const tabContentRef = useRef(null);
-  const tabOrder = useMemo(() => [
-    'terminal',
-    'dashboard',
-    'roster',
-    ...(isManager ? ['admin'] : []),
-  ], [isManager]);
-
-  // Attach native passive touch listeners for swipe detection
-  useEffect(() => {
-    const el = tabContentRef.current;
-    if (!el) return;
-
-    const swipe = touchSwipeRef.current;
-
-    const onTouchStart = (e) => {
-      swipe.startX = e.touches[0].clientX;
-      swipe.startY = e.touches[0].clientY;
-    };
-
-    const onTouchEnd = (e) => {
-      const dx = e.changedTouches[0].clientX - swipe.startX;
-      const dy = e.changedTouches[0].clientY - swipe.startY;
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(dy);
-      if (absDx > 60 && absDx > absDy * 1.5) {
-        const currentIdx = tabOrder.indexOf(activeTab);
-        if (dx < 0 && currentIdx < tabOrder.length - 1) {
-          setSwipeDir('left');
-          setTimeout(() => {
-            setActiveTab(tabOrder[currentIdx + 1]);
-            setSwipeDir(null);
-          }, 50);
-        } else if (dx > 0 && currentIdx > 0) {
-          setSwipeDir('right');
-          setTimeout(() => {
-            setActiveTab(tabOrder[currentIdx - 1]);
-            setSwipeDir(null);
-          }, 50);
-        }
-      }
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
-
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [activeTab, tabOrder]);
 
   // The previous tabOrder reference for swipe detection (stable across renders)
   // Updated in the effect above which depends on activeTab and tabOrder
@@ -160,8 +105,34 @@ export default function Portal() {
       <header style={{
         padding: 'clamp(16px, 3vw, 24px) clamp(12px, 3vw, 20px) clamp(12px, 2vw, 16px)',
         textAlign: 'center',
-        background: 'radial-gradient(circle at top, #083344, transparent)',
+        background: 'var(--header-bg)',
+        position: 'relative',
       }}>
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            position: 'absolute',
+            top: 'clamp(12px, 2vw, 20px)',
+            right: 'clamp(12px, 3vw, 20px)',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '50%',
+            width: 'clamp(36px, 4.5vw, 44px)',
+            height: 'clamp(36px, 4.5vw, 44px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: 'clamp(0.95rem, 2vw, 1.15rem)',
+            color: 'var(--text-primary)',
+            transition: 'all 0.2s',
+            zIndex: 10,
+          }}
+          title="Toggle Theme"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -246,11 +217,9 @@ export default function Portal() {
             )}
           </div>
 
-        {/* Tab Content — with swipe + pull-to-refresh support */}
-        {/* Uses native passive touch listeners (via ref) for smooth scrolling */}
+        {/* Tab Content — with pull-to-refresh support */}
         <div
-          ref={tabContentRef}
-          className={`tab-content ${swipeDir ? 'swipe-' + swipeDir : ''}`}
+          className="tab-content"
           key={activeTab}
         >
           <PullToRefresh

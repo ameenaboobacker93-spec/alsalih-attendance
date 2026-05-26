@@ -9,6 +9,21 @@ export function AppProvider({ children }) {
   const [currentBranch, setCurrentBranch] = useState(null);
   const sessionTimerRef = useRef(null);
 
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('app-theme') || 'dark';
+    document.documentElement.classList.toggle('light-theme', saved === 'light');
+    return saved;
+  });
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('app-theme', next);
+      document.documentElement.classList.toggle('light-theme', next === 'light');
+      return next;
+    });
+  }, []);
+
   // ── Toast ──
   const showToast = useCallback((message, isError = false) => {
     setToast({ message, isError, visible: true });
@@ -62,6 +77,8 @@ export function AppProvider({ children }) {
       currentBranch,
       setCurrentBranch,
       resetSessionTimer,
+      theme,
+      toggleTheme,
     }}>
       {children}
       {loadingMsg && (

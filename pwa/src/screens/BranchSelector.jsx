@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBranch } from '../hooks/useBranch';
+import { useApp } from '../hooks/useApp';
 
 export default function BranchSelector() {
   const navigate = useNavigate();
   const { branches, loading, error } = useBranch();
+  const { theme, toggleTheme } = useApp();
 
   function selectBranch(branch) {
     navigate(`/portal/${branch.code.toLowerCase()}`);
@@ -18,8 +20,34 @@ export default function BranchSelector() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '40px 20px',
-      background: 'radial-gradient(circle at 50% 0%, #083344, #0f172a 70%)',
+      background: 'var(--bg-gradient)',
+      position: 'relative',
     }}>
+      {/* Theme Toggle Button */}
+      <button
+        onClick={toggleTheme}
+        style={{
+          position: 'absolute',
+          top: 'clamp(12px, 2vw, 20px)',
+          right: 'clamp(12px, 3vw, 20px)',
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '50%',
+          width: 'clamp(36px, 4.5vw, 44px)',
+          height: 'clamp(36px, 4.5vw, 44px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: 'clamp(0.95rem, 2vw, 1.15rem)',
+          color: 'var(--text-primary)',
+          transition: 'all 0.2s',
+          zIndex: 10,
+        }}
+        title="Toggle Theme"
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
       {/* Brand */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{
@@ -90,7 +118,7 @@ export default function BranchSelector() {
         }}>
           <p style={{
             textAlign: 'center',
-            color: 'rgba(255,255,255,0.5)',
+            color: 'var(--text-secondary)',
             fontSize: '0.65rem',
             letterSpacing: 2,
             textTransform: 'uppercase',
@@ -105,8 +133,8 @@ export default function BranchSelector() {
               className="fade-in"
               style={{
                 animationDelay: `${index * 100}ms`,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
                 borderRadius: 20,
                 padding: 'clamp(18px, 3vw, 24px)',
                 display: 'flex',
@@ -115,19 +143,19 @@ export default function BranchSelector() {
                 transition: 'all 0.3s',
                 textAlign: 'left',
                 cursor: 'pointer',
-                color: 'white',
+                color: 'var(--text-primary)',
                 width: '100%',
                 minHeight: 'var(--touch-min)',
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = '#06b6d4';
-                e.currentTarget.style.background = 'rgba(6,182,212,0.08)';
+                e.currentTarget.style.background = 'var(--accent-dim)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(6,182,212,0.15)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(6, 182, 212, 0.15)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
