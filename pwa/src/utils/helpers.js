@@ -76,6 +76,7 @@ export function getStatusClass(status) {
     case 'PENDING_APPROVAL': return 'status-pending';
     case 'INCOMPLETE': return 'status-incomplete';
     case 'MISSING': return 'status-missing';
+    case 'COMPENSATED': return 'status-comp';
     case 'NORMAL': return 'status-normal';
     default: return '';
   }
@@ -88,6 +89,7 @@ export function getStatusLabel(status) {
     case 'PENDING_APPROVAL': return 'PENDING APPROVAL';
     case 'INCOMPLETE': return 'INCOMPLETE';
     case 'MISSING': return 'MISSING';
+    case 'COMPENSATED': return 'COMPENSATED';
     case 'NORMAL': return 'NORMAL';
     default: return status || '---';
   }

@@ -247,6 +247,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
                     <tr>
                       <th className="th-date">DATE</th>
                       <th className="th-shift">SHIFT</th>
+                      <th className="th-hrs">HRS</th>
                       <th className="th-ot">OT</th>
                       <th className="th-status">STATUS</th>
                     </tr>
@@ -260,6 +261,9 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
                         </td>
                         <td className="td-shift">
                           <span className="shift-text">{log.shift}</span>
+                        </td>
+                        <td className="td-hrs">
+                          {log.totalHours || '---'}
                         </td>
                         <td className="td-ot">
                           {log.otValue}

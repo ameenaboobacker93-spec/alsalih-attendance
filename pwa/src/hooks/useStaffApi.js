@@ -309,6 +309,7 @@ export function useStaffApi(branchId) {
       const checkOut = log?.check_out ? new Date(log.check_out) : null;
       let otVal = 0;
       let status = '';
+      let totalHours = '';
 
       // Off day: only when roster explicitly marks as off day AND no entries exist
       if (rosterEntry?.is_off_day && !checkIn && !checkOut) {
@@ -324,16 +325,22 @@ export function useStaffApi(branchId) {
 
         if (otAdj && otAdj.ot_value != null) {
           otVal = parseFloat(otAdj.ot_value);
-          status = otVal > 0 ? 'OT_APPROVED' : 'NORMAL';
+          status = otVal > 0 ? 'OT_APPROVED' : (actualHours < dutyHrs ? 'COMPENSATED' : 'NORMAL');
           if (otVal > 0) calcOt += otVal;
         } else if (actualHours > dutyHrs) {
           // OT: when staff works more than their duty hours
           otVal = actualHours - dutyHrs;
           status = 'PENDING_APPROVAL';
+        } else if (actualHours < dutyHrs) {
+          // Reduced hours — show as compensated
+          status = 'COMPENSATED';
         } else {
-          // Normal or reduced hours — no action needed
+          // Exactly duty hours — normal
           status = 'NORMAL';
         }
+
+        // Format total hours for display
+        totalHours = actualHours.toFixed(2).replace(/\.?0+$/, '');
       }
 
       dailyLogs.push({
@@ -345,6 +352,7 @@ export function useStaffApi(branchId) {
         shift: (checkIn ? checkIn.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '---') +
                ' - ' +
                (checkOut ? checkOut.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '---'),
+        totalHours,
         otValue: otVal.toFixed(2),
         status,
         hasRoster: !!rosterEntry,

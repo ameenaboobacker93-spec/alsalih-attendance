@@ -28,9 +28,9 @@ export default function Portal() {
     setRefreshKey(k => k + 1);
   }, []);
 
-  // ── Swipe to switch tabs ──
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
+  // ── Swipe to switch tabs (native passive listeners — no scroll blocking) ──
+  const touchSwipeRef = useRef({ startX: 0, startY: 0 });
+  const tabContentRef = useRef(null);
   const tabOrder = useMemo(() => [
     'terminal',
     'dashboard',
@@ -38,36 +38,52 @@ export default function Portal() {
     ...(isManager ? ['admin'] : []),
   ], [isManager]);
 
-  function handleTouchStart(e) {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }
+  // Attach native passive touch listeners for swipe detection
+  useEffect(() => {
+    const el = tabContentRef.current;
+    if (!el) return;
 
-  function handleTouchEnd(e) {
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    const dy = e.changedTouches[0].clientY - touchStartY.current;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    // Only horizontal swipes, minimum 60px, more horizontal than vertical
-    if (absDx > 60 && absDx > absDy * 1.5) {
-      const currentIdx = tabOrder.indexOf(activeTab);
-      if (dx < 0 && currentIdx < tabOrder.length - 1) {
-        // Swipe left → next tab
-        setSwipeDir('left');
-        setTimeout(() => {
-          setActiveTab(tabOrder[currentIdx + 1]);
-          setSwipeDir(null);
-        }, 50);
-      } else if (dx > 0 && currentIdx > 0) {
-        // Swipe right → previous tab
-        setSwipeDir('right');
-        setTimeout(() => {
-          setActiveTab(tabOrder[currentIdx - 1]);
-          setSwipeDir(null);
-        }, 50);
+    const swipe = touchSwipeRef.current;
+
+    const onTouchStart = (e) => {
+      swipe.startX = e.touches[0].clientX;
+      swipe.startY = e.touches[0].clientY;
+    };
+
+    const onTouchEnd = (e) => {
+      const dx = e.changedTouches[0].clientX - swipe.startX;
+      const dy = e.changedTouches[0].clientY - swipe.startY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      if (absDx > 60 && absDx > absDy * 1.5) {
+        const currentIdx = tabOrder.indexOf(activeTab);
+        if (dx < 0 && currentIdx < tabOrder.length - 1) {
+          setSwipeDir('left');
+          setTimeout(() => {
+            setActiveTab(tabOrder[currentIdx + 1]);
+            setSwipeDir(null);
+          }, 50);
+        } else if (dx > 0 && currentIdx > 0) {
+          setSwipeDir('right');
+          setTimeout(() => {
+            setActiveTab(tabOrder[currentIdx - 1]);
+            setSwipeDir(null);
+          }, 50);
+        }
       }
-    }
-  }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [activeTab, tabOrder]);
+
+  // The previous tabOrder reference for swipe detection (stable across renders)
+  // Updated in the effect above which depends on activeTab and tabOrder
 
   const api = useStaffApi(branch?.id);
 
@@ -231,11 +247,11 @@ export default function Portal() {
           </div>
 
         {/* Tab Content — with swipe + pull-to-refresh support */}
+        {/* Uses native passive touch listeners (via ref) for smooth scrolling */}
         <div
+          ref={tabContentRef}
           className={`tab-content ${swipeDir ? 'swipe-' + swipeDir : ''}`}
           key={activeTab}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
         >
           <PullToRefresh
             onRefresh={handleRefresh}

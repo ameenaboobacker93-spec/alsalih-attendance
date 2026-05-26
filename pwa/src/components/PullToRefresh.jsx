@@ -1,77 +1,88 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 export default function PullToRefresh({ onRefresh, children, disabled = false }) {
   const [pullState, setPullState] = useState('idle'); // idle | pulling | refreshing
   const [pullDistance, setPullDistance] = useState(0);
-  const touchStartY = useRef(0);
-  const pullDistanceRef = useRef(0); // Real-time track to avoid stale closures
-  const containerRef = useRef(null);
-  const isPulling = useRef(false);
+  const wrapperRef = useRef(null);
+  const pullDist = useRef(0);
+  const refreshing = useRef(false);
 
-  const handleTouchStart = useCallback((e) => {
-    if (disabled) return;
-    // Only activate if the page itself is scrolled to the very top
-    // Use window.scrollY so scrolling inside child containers (like dashboard table) doesn't trigger pull-to-refresh
-    const pageScrollTop = window.scrollY || window.pageYOffset || 0;
-    if (pageScrollTop <= 0) {
-      touchStartY.current = e.touches[0].clientY;
-      isPulling.current = false;
-      pullDistanceRef.current = 0;
-    }
-  }, [disabled]);
+  // Use native DOM listeners with { passive: true } for smooth mobile scrolling.
+  // React's synthetic touch events are always non-passive, which causes iOS Safari
+  // to delay scroll initiation (waiting to see if preventDefault() is called).
+  // Passive listeners tell the browser: "scroll immediately, I won't block it."
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el || disabled) return;
 
-  const handleTouchMove = useCallback((e) => {
-    if (disabled || pullState === 'refreshing') return;
-    const dy = e.touches[0].clientY - touchStartY.current;
-    if (dy > 0) {
-      // Pulling down        const pageScrollTop = window.scrollY || window.pageYOffset || 0;
-        if (pageScrollTop <= 0) {
-        isPulling.current = true;
-        // Stop propagation to prevent tab swipe from firing
-        e.stopPropagation();
-        // Apply resistance: sqrt scaling makes it feel natural
-        const distance = Math.min(Math.sqrt(dy * 8), 150);
-        pullDistanceRef.current = distance;
-        setPullDistance(distance);
-        setPullState('pulling');
+    let startY = 0;
+    let isPulling = false;
+
+    const onTouchStart = (e) => {
+      if (refreshing.current) return;
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      if (scrollY <= 0) {
+        startY = e.touches[0].clientY;
+        isPulling = false;
+        pullDist.current = 0;
       }
-    }
-  }, [disabled, pullState]);
+    };
 
-  const handleTouchEnd = useCallback(async () => {
-    if (disabled || !isPulling.current) return;
-    isPulling.current = false;
-
-    // Use ref to get real-time value (not stale state)
-    if (pullDistanceRef.current >= 70) {
-      // Trigger refresh
-      setPullState('refreshing');
-      setPullDistance(44); // Spinner size while refreshing
-      try {
-        if (onRefresh) {
-          await onRefresh();
+    const onTouchMove = (e) => {
+      if (refreshing.current) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0) {
+        const scrollY = window.scrollY || window.pageYOffset || 0;
+        if (scrollY <= 0) {
+          isPulling = true;
+          const distance = Math.min(Math.sqrt(dy * 8), 150);
+          pullDist.current = distance;
+          setPullDistance(distance);
+          setPullState('pulling');
         }
-      } finally {
-        // Snap back
-        pullDistanceRef.current = 0;
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (refreshing.current || !isPulling) return;
+      isPulling = false;
+
+      if (pullDist.current >= 70) {
+        setPullState('refreshing');
+        setPullDistance(44);
+        refreshing.current = true;
+
+        // Trigger refresh asynchronously, then reset
+        Promise.resolve(typeof onRefresh === 'function' ? onRefresh() : null)
+          .catch(() => {})
+          .finally(() => {
+            pullDist.current = 0;
+            setPullDistance(0);
+            setPullState('idle');
+            refreshing.current = false;
+          });
+      } else {
+        pullDist.current = 0;
         setPullDistance(0);
         setPullState('idle');
       }
-    } else {
-      // Snap back without refresh
-      pullDistanceRef.current = 0;
-      setPullDistance(0);
-      setPullState('idle');
-    }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
   }, [disabled, onRefresh]);
 
   return (
     <div
-      ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      style={{ position: 'relative', overscrollBehavior: 'none' }}
+      ref={wrapperRef}
+      style={{ position: 'relative' }}
     >
       {/* Pull indicator */}
       <div
