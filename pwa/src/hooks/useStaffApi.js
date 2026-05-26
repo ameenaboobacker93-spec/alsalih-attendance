@@ -34,6 +34,7 @@ export function useStaffApi(branchId) {
       .from('staff')
       .select('*')
       .eq('branch_id', branchId)
+      .eq('is_active', true)
       .order('name');
 
     if (error) throw error;

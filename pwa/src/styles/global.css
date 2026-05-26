@@ -57,9 +57,7 @@ html, body {
   min-height: 100vh;
   min-height: -webkit-fill-available;
   overflow-x: hidden;
-  overscroll-behavior: contain;
-  touch-action: pan-y pinch-zoom;
-  -webkit-overflow-scrolling: auto;
+  -webkit-overflow-scrolling: touch;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
