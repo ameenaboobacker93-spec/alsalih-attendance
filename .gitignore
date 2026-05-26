@@ -1,0 +1,11 @@
+# PWA
+pwa/node_modules/
+pwa/dist/
+pwa/.env
+pwa/.DS_Store
+pwa/*.log
+
+# Root
+node_modules/
+.DS_Store
+*.log
