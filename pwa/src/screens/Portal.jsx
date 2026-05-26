@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBranch } from '../hooks/useBranch';
 import { useApp } from '../hooks/useApp';
 import { useStaffApi } from '../hooks/useStaffApi';
+import PullToRefresh from '../components/PullToRefresh';
 import Terminal from './Terminal';
 import Dashboard from './Dashboard';
 import AdminPanel from './AdminPanel';
@@ -15,11 +16,58 @@ export default function Portal() {
   const { showToast, isManager, login, logout } = useApp();
   const [branch, setBranch] = useState(null);
   const [activeTab, setActiveTab] = useState('terminal');
+  const [swipeDir, setSwipeDir] = useState(null);
   const [staffList, setStaffList] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey(k => k + 1);
+  }, []);
+
+  // ── Swipe to switch tabs ──
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const tabOrder = useMemo(() => [
+    'terminal',
+    'dashboard',
+    'roster',
+    ...(isManager ? ['admin'] : []),
+  ], [isManager]);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+
+  function handleTouchEnd(e) {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    // Only horizontal swipes, minimum 60px, more horizontal than vertical
+    if (absDx > 60 && absDx > absDy * 1.5) {
+      const currentIdx = tabOrder.indexOf(activeTab);
+      if (dx < 0 && currentIdx < tabOrder.length - 1) {
+        // Swipe left → next tab
+        setSwipeDir('left');
+        setTimeout(() => {
+          setActiveTab(tabOrder[currentIdx + 1]);
+          setSwipeDir(null);
+        }, 50);
+      } else if (dx > 0 && currentIdx > 0) {
+        // Swipe right → previous tab
+        setSwipeDir('right');
+        setTimeout(() => {
+          setActiveTab(tabOrder[currentIdx - 1]);
+          setSwipeDir(null);
+        }, 50);
+      }
+    }
+  }
 
   const api = useStaffApi(branch?.id);
 
@@ -152,119 +200,84 @@ export default function Portal() {
         }}>
           {clock}
         </div>
-      </header>
+      </header>        {/* Tab Navigation */}
+        <div className="container" style={{ maxWidth: 700 }}>
+          <div className="tab-bar">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                className={`nav-btn ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span className="tab-icon">{tab.icon}</span>
+                <span className="tab-label">{tab.label}</span>
+              </button>
+            ))}
+            {isManager ? (
+              <button
+                onClick={logout}
+                className="nav-btn auth-btn logout"
+              >
+                🔒
+              </button>
+            ) : (
+              <button
+                onClick={() => { setAdminPinInput(''); setShowAdminLogin(true); }}
+                className="nav-btn auth-btn login"
+              >
+                🔐
+              </button>
+            )}
+          </div>
 
-      {/* Tab Navigation */}
-      <div className="container" style={{ maxWidth: 700 }}>
-        <div className="tab-scroll" style={{
-          justifyContent: 'center',
-          marginBottom: 20,
-          paddingBottom: 8,
-        }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`nav-btn ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                paddingLeft: 'clamp(14px, 3vw, 20px)',
-                paddingRight: 'clamp(14px, 3vw, 20px)',
-                paddingTop: 'clamp(8px, 1.5vw, 10px)',
-                paddingBottom: 'clamp(8px, 1.5vw, 10px)',
-                borderRadius: 30,
-                cursor: 'pointer',
-                border: activeTab === tab.id
-                  ? '1px solid transparent'
-                  : '1px solid rgba(255,255,255,0.1)',
-                background: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.05)',
-                fontWeight: 700,
-                fontSize: 'clamp(0.7rem, 2vw, 0.8rem)',
-                color: activeTab === tab.id ? '#000' : '#f8fafc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                minHeight: 'var(--touch-min)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-          {isManager ? (
-            <button
-              onClick={logout}
-              style={{
-                padding: 'clamp(8px, 1.5vw, 10px) clamp(12px, 3vw, 16px)',
-                borderRadius: 30,
-                cursor: 'pointer',
-                border: '1px solid rgba(239,68,68,0.3)',
-                background: 'rgba(239,68,68,0.1)',
-                fontWeight: 700,
-                fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)',
-                color: '#ef4444',
-                minHeight: 'var(--touch-min)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🔒 Logout
-            </button>
-          ) : (
-            <button
-              onClick={() => { setAdminPinInput(''); setShowAdminLogin(true); }}
-              style={{
-                padding: 'clamp(8px, 1.5vw, 10px) clamp(12px, 3vw, 16px)',
-                borderRadius: 30,
-                cursor: 'pointer',
-                border: '1px solid rgba(6,182,212,0.3)',
-                background: 'rgba(6,182,212,0.1)',
-                fontWeight: 700,
-                fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)',
-                color: '#06b6d4',
-                minHeight: 'var(--touch-min)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              🔐 Admin Login
-            </button>
-          )}
-        </div>
-
-        {/* Tab Content */}
-        <div className="fade-in" key={activeTab}>
-          {activeTab === 'terminal' && (
-            <Terminal
-              branch={branch}
-              staffList={staffList}
-              api={api}
-              selectedStaff={selectedStaff}
-              setSelectedStaff={setSelectedStaff}
-            />
-          )}
-          {activeTab === 'dashboard' && (
-            <Dashboard
-              branch={branch}
-              staffList={staffList}
-              api={api}
-              isManager={isManager}
-            />
-          )}
-          {activeTab === 'roster' && (
-            <DutyRoster
-              branch={branch}
-              staffList={staffList}
-              api={api}
-              isManager={isManager}
-            />
-          )}
-          {activeTab === 'admin' && isManager && (
-            <AdminPanel
-              branch={branch}
-              staffList={staffList}
-              setStaffList={setStaffList}
-              api={api}
-            />
-          )}
+        {/* Tab Content — with swipe + pull-to-refresh support */}
+        <div
+          className={`tab-content ${swipeDir ? 'swipe-' + swipeDir : ''}`}
+          key={activeTab}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <PullToRefresh
+            onRefresh={handleRefresh}
+          >
+            {activeTab === 'terminal' && (
+              <Terminal
+                branch={branch}
+                staffList={staffList}
+                api={api}
+                selectedStaff={selectedStaff}
+                setSelectedStaff={setSelectedStaff}
+                refreshKey={refreshKey}
+              />
+            )}
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                branch={branch}
+                staffList={staffList}
+                api={api}
+                isManager={isManager}
+                refreshKey={refreshKey}
+              />
+            )}
+            {activeTab === 'roster' && (
+              <DutyRoster
+                branch={branch}
+                staffList={staffList}
+                api={api}
+                isManager={isManager}
+                refreshKey={refreshKey}
+              />
+            )}
+            {activeTab === 'admin' && isManager && (
+              <AdminPanel
+                branch={branch}
+                staffList={staffList}
+                setStaffList={setStaffList}
+                api={api}
+                refreshKey={refreshKey}
+              />
+            )}
+          </PullToRefresh>
         </div>
       </div>
 

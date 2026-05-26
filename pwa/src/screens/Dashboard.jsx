@@ -9,7 +9,7 @@ import {
 } from '../utils/helpers';
 import ConfirmModal from '../components/ConfirmModal';
 
-export default function Dashboard({ branch, staffList, api, isManager }) {
+export default function Dashboard({ branch, staffList, api, isManager, refreshKey }) {
   const { showToast, showLoading, hideLoading } = useApp();
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
@@ -28,12 +28,37 @@ export default function Dashboard({ branch, staffList, api, isManager }) {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState({ visible: false, id: null, date: '', staffName: '' });
 
+  // Today's summary state (branch-wide stats)
+  const [todaySummary, setTodaySummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   // Load dashboard when staff or month changes
   useEffect(() => {
     if (selectedStaff && selectedMonth) {
       loadDashboard();
     }
-  }, [selectedStaff?.id, selectedMonth]);
+  }, [selectedStaff?.id, selectedMonth, refreshKey]);
+
+  // Load today's branch-wide summary
+  useEffect(() => {
+    loadTodaySummary();
+  }, [refreshKey, staffList.length]);
+
+  async function loadTodaySummary() {
+    setSummaryLoading(true);
+    try {
+      const statusList = await api.getOnDutyStatus();
+      const total = staffList.length;
+      const onDuty = statusList.filter(s => s.status === 'ON DUTY').length;
+      const checkedOut = statusList.filter(s => s.status === 'OFF').length;
+      const absent = Math.max(0, total - statusList.length);
+      setTodaySummary({ total, onDuty, checkedOut, absent });
+    } catch {
+      // Silent fail
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
 
   async function loadDashboard() {
     if (!selectedStaff) return;
@@ -144,6 +169,9 @@ export default function Dashboard({ branch, staffList, api, isManager }) {
     }
   }
 
+  // Filter out OFF_DAY and MISSING entries — show only actual attendance days
+  const activeLogs = dashboardData?.logs?.filter(l => l.status !== 'OFF_DAY' && l.status !== 'MISSING') || [];
+
   return (
     <div>
       {/* Controls */}
@@ -196,6 +224,37 @@ export default function Dashboard({ branch, staffList, api, isManager }) {
         </div>
       </div>
 
+      {/* Today's Summary — Branch-wide stats */}
+      <div className="card today-summary-card" style={{ marginBottom: 16 }}>
+        <div className="section-title" style={{ marginBottom: 12 }}>
+          Today at a Glance
+        </div>
+        {summaryLoading && todaySummary === null ? (
+          <div className="today-summary-loading">Loading...</div>
+        ) : todaySummary ? (
+          <div className="today-summary-grid">
+            <div className="today-stat">
+              <div className="today-stat-num">{todaySummary.total}</div>
+              <div className="today-stat-lbl">Total Staff</div>
+            </div>
+            <div className="today-stat today-stat-on-duty">
+              <div className="today-stat-num">{todaySummary.onDuty}</div>
+              <div className="today-stat-lbl">🟢 On Duty</div>
+            </div>
+            <div className="today-stat today-stat-out">
+              <div className="today-stat-num">{todaySummary.checkedOut}</div>
+              <div className="today-stat-lbl">🔵 Checked Out</div>
+            </div>
+            <div className="today-stat today-stat-absent">
+              <div className="today-stat-num">{todaySummary.absent}</div>
+              <div className="today-stat-lbl">⚪ Absent</div>
+            </div>
+          </div>
+        ) : (
+          <div className="today-summary-loading">No data available</div>
+        )}
+      </div>
+
       {/* Summary Card */}
       {dashboardData && (
         <>
@@ -235,132 +294,99 @@ export default function Dashboard({ branch, staffList, api, isManager }) {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="card" style={{ padding: 'clamp(12px, 2vw, 20px)' }}>
-            <div className="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ color: '#06b6d4', fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)', textAlign: 'left', padding: '0 8px 8px', textTransform: 'uppercase', fontWeight: 800, whiteSpace: 'nowrap' }}>DATE</th>
-                    <th style={{ color: '#06b6d4', fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)', textAlign: 'left', padding: '0 8px 8px', textTransform: 'uppercase', fontWeight: 800, whiteSpace: 'nowrap' }}>SHIFT</th>
-                    <th style={{ color: '#06b6d4', fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)', textAlign: 'center', padding: '0 8px 8px', textTransform: 'uppercase', fontWeight: 800, whiteSpace: 'nowrap' }}>OT</th>
-                    <th style={{ color: '#06b6d4', fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)', textAlign: 'right', padding: '0 8px 8px', textTransform: 'uppercase', fontWeight: 800, whiteSpace: 'nowrap' }}>STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardData.logs.map(log => (
-                    <tr key={log.date}>
-                      <td style={{ padding: '10px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px 0 0 8px', fontWeight: 600, fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)', whiteSpace: 'nowrap' }}>
-                        {log.displayDate}
-                        {log.isSplit && <span style={{ marginLeft: 4, fontSize: '0.55rem', color: '#a78bfa' }}>⤵</span>}
-                      </td>
-                      <td style={{ padding: '10px 8px', background: 'rgba(255,255,255,0.02)', fontSize: 'clamp(0.65rem, 1.4vw, 0.75rem)' }}>
-                        <small style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>{log.shift}</small>
-                      </td>
-                      <td style={{ padding: '10px 8px', background: 'rgba(255,255,255,0.02)', textAlign: 'center', fontWeight: 700, fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)', whiteSpace: 'nowrap' }}>
-                        {log.otValue}
-                      </td>
-                      <td style={{ padding: '10px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '0 8px 8px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <span className={`status-pill ${getStatusClass(log.status)}`}
-                          style={{ fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)' }}>
-                          {getStatusLabel(log.status)}
-                        </span>
-                        {/* Manager actions */}
-                        {isManager && (
-                          <div style={{ display: 'inline-flex', gap: 4, marginLeft: 6, flexWrap: 'nowrap', alignItems: 'center' }}>
-                            {/* PENDING_APPROVAL → Approve / Reject */}
-                            {log.status === 'PENDING_APPROVAL' && (
-                              <>
-                                <button
-                                  onClick={() => handleApproveOT(log)}
-                                  style={{
-                                    background: '#10b981',
-                                    border: 'none',
-                                    borderRadius: 5,
-                                    fontSize: 'clamp(0.45rem, 1vw, 0.5rem)',
-                                    padding: '4px 6px',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 800,
-                                    textTransform: 'uppercase',
-                                    whiteSpace: 'nowrap',
-                                    minHeight: 24,
-                                  }}
-                                  title="Approve OT"
-                                >
-                                  ✓ OT
-                                </button>
-                                <button
-                                  onClick={() => handleRejectOT(log)}
-                                  style={{
-                                    background: '#6b7280',
-                                    border: 'none',
-                                    borderRadius: 5,
-                                    fontSize: 'clamp(0.45rem, 1vw, 0.5rem)',
-                                    padding: '4px 6px',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 800,
-                                    textTransform: 'uppercase',
-                                    whiteSpace: 'nowrap',
-                                    minHeight: 24,
-                                  }}
-                                  title="Reject OT"
-                                >
-                                  ✗ No OT
-                                </button>
-                              </>
-                            )}
-                            {/* INCOMPLETE → Fix times */}
-                            {log.status === 'INCOMPLETE' && (
-                              <button
-                                onClick={() => openFix(log.date, log.status)}
-                                style={{
-                                  background: '#06b6d4',
-                                  border: 'none',
-                                  borderRadius: 5,
-                                  fontSize: 'clamp(0.45rem, 1vw, 0.5rem)',
-                                  padding: '4px 8px',
-                                  color: 'white',
-                                  cursor: 'pointer',
-                                  fontWeight: 800,
-                                  textTransform: 'uppercase',
-                                  minHeight: 24,
-                                }}
-                              >
-                                FIX
-                              </button>
-                            )}
-                            {/* Delete button for entries with a log */}
-                            {log.id && (
-                              <button
-                                onClick={() => handleDeleteClick(log)}
-                                style={{
-                                  background: '#ef4444',
-                                  border: 'none',
-                                  borderRadius: 5,
-                                  fontSize: 'clamp(0.45rem, 1vw, 0.5rem)',
-                                  padding: '4px 6px',
-                                  color: 'white',
-                                  cursor: 'pointer',
-                                  fontWeight: 800,
-                                  opacity: 0.7,
-                                  minHeight: 24,
-                                }}
-                                title="Delete entry"
-                              >
-                                🗑
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
+          {/* Table — only shows days with actual attendance entries */}
+          {activeLogs.length > 0 && (
+            <div className="card dashboard-table-card" style={{ padding: 'clamp(8px, 1.5vw, 20px)' }}>
+              <div className="responsive-table dashboard-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th className="th-date">DATE</th>
+                      <th className="th-shift">SHIFT</th>
+                      <th className="th-ot">OT</th>
+                      <th className="th-status">STATUS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {activeLogs.map(log => (
+                      <tr key={log.date}>
+                        <td className="td-date">
+                          {log.displayDate}
+                          {log.isSplit && <span className="split-badge">⤵</span>}
+                        </td>
+                        <td className="td-shift">
+                          <span className="shift-text">{log.shift}</span>
+                        </td>
+                        <td className="td-ot">
+                          {log.otValue}
+                        </td>
+                        <td className="td-status">
+                          <span className={`status-pill ${getStatusClass(log.status)}`}>
+                            {getStatusLabel(log.status)}
+                          </span>
+                          {/* Manager actions */}
+                          {isManager && (
+                            <div className="mgr-actions">
+                              {/* PENDING_APPROVAL → Approve / Reject */}
+                              {log.status === 'PENDING_APPROVAL' && (
+                                <>
+                                  <button
+                                    onClick={() => handleApproveOT(log)}
+                                    className="mgr-btn approve"
+                                    title="Approve OT"
+                                  >
+                                    ✓ OT
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectOT(log)}
+                                    className="mgr-btn reject"
+                                    title="Reject OT"
+                                  >
+                                    ✗ No
+                                  </button>
+                                </>
+                              )}
+                              {/* INCOMPLETE → Fix times */}
+                              {log.status === 'INCOMPLETE' && (
+                                <button
+                                  onClick={() => openFix(log.date, log.status)}
+                                  className="mgr-btn fix"
+                                >
+                                  FIX
+                                </button>
+                              )}
+                              {/* Delete button for entries with a log */}
+                              {log.id && (
+                                <button
+                                  onClick={() => handleDeleteClick(log)}
+                                  className="mgr-btn delete"
+                                  title="Delete entry"
+                                >
+                                  🗑
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Message when no active entries */}
+          {activeLogs.length === 0 && dashboardData && (
+            <div className="card" style={{ textAlign: 'center', padding: 'clamp(20px, 4vw, 30px)', opacity: 0.5 }}>
+              <p style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)' }}>
+                No attendance entries for this month
+              </p>
+              <small style={{ fontSize: 'clamp(0.55rem, 1.2vw, 0.65rem)' }}>
+                All days are off days
+              </small>
+            </div>
+          )}
         </>
       )}
 
