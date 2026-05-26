@@ -74,8 +74,8 @@ export function getStatusClass(status) {
     case 'OT_APPROVED': return 'status-ot';
     case 'OFF_DAY': return 'status-off';
     case 'PENDING_APPROVAL': return 'status-pending';
-    case 'COMPENSATED': return 'status-comp';
     case 'INCOMPLETE': return 'status-incomplete';
+    case 'MISSING': return 'status-missing';
     case 'NORMAL': return 'status-normal';
     default: return '';
   }
@@ -86,8 +86,8 @@ export function getStatusLabel(status) {
     case 'OT_APPROVED': return 'OT APPROVED';
     case 'OFF_DAY': return 'OFF DAY';
     case 'PENDING_APPROVAL': return 'PENDING APPROVAL';
-    case 'COMPENSATED': return 'COMPENSATED';
     case 'INCOMPLETE': return 'INCOMPLETE';
+    case 'MISSING': return 'MISSING';
     case 'NORMAL': return 'NORMAL';
     default: return status || '---';
   }

@@ -254,8 +254,8 @@ label {
 .status-ot { background: #1e3a8a; color: #fff; }
 .status-off { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .status-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.status-comp { background: rgba(59, 130, 246, 0.2); color: var(--info); }
 .status-incomplete { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+.status-missing { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
 .status-normal { background: rgba(16, 185, 129, 0.15); color: var(--success); }
 
 /* ── Loading ── */
@@ -379,6 +379,41 @@ label {
   }
   .stat-card .num {
     font-size: 1.6rem;
+  }
+}
+
+/* ── Compact Stat Card (Dashboard) ── */
+.stat-card.compact {
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+}
+
+.stat-card.compact .num {
+  font-size: 1.4rem;
+}
+
+.stat-card.compact .lbl {
+  font-size: 0.5rem;
+  margin-top: 2px;
+  letter-spacing: 1.5px;
+}
+
+@media (max-width: 480px) {
+  .stat-card.compact {
+    padding: 10px 6px;
+  }
+  .stat-card.compact .num {
+    font-size: 1.2rem;
+  }
+}
+
+.dashboard-stats {
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .dashboard-stats {
+    gap: 6px;
   }
 }
 
@@ -506,13 +541,35 @@ label {
   }
 }
 
-/* Dashboard table — scroll horizontally only, full height so all entries visible */
+/* Dashboard table — page-level scrolling, no nested scroll conflicts */
 .dashboard-table-card {
-  overflow: hidden;
+  overflow: visible;
+  padding: clamp(8px, 1.5vw, 20px);
 }
 
 .dashboard-table {
-  max-height: none;
+  width: 100%;
+}
+
+.dashboard-table table {
+  font-size: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .dashboard-table-card {
+    padding: 6px !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .dashboard-table table {
+    font-size: 0.65rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 900px) {
+  .dashboard-table table {
+    font-size: 0.7rem;
+  }
 }
 
 /* ── Dashboard Table Cells ── */
@@ -583,25 +640,29 @@ label {
 
 .mgr-actions {
   display: inline-flex;
-  gap: 3px;
-  margin-left: 4px;
+  gap: 4px;
+  margin-left: 6px;
   flex-wrap: nowrap;
   align-items: center;
 }
 
 .mgr-btn {
   border: none;
-  border-radius: 4px;
-  font-size: 0.5rem;
-  padding: 3px 5px;
+  border-radius: 6px;
+  font-size: 0.55rem;
+  padding: 5px 8px;
   color: white;
   cursor: pointer;
   font-weight: 800;
   text-transform: uppercase;
   white-space: nowrap;
-  min-height: 22px;
+  min-height: 28px;
+  min-width: 32px;
   font-family: inherit;
   transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mgr-btn.approve { background: #10b981; }
@@ -609,56 +670,21 @@ label {
 .mgr-btn.fix { background: #06b6d4; }
 .mgr-btn.delete { background: #ef4444; opacity: 0.7; }
 
+.mgr-btn:active {
+  transform: scale(0.93);
+}
+
 @media (max-width: 480px) {
-  .th-date,
-  .th-shift,
-  .th-ot,
-  .th-status {
-    font-size: 0.48rem;
-    padding: 0 4px 4px;
-  }
-
-  .td-date {
-    padding: 6px 4px;
-    font-size: 0.6rem;
-  }
-
-  .td-shift {
-    padding: 6px 4px;
-    font-size: 0.55rem;
-  }
-
-  .td-shift .shift-text {
-    max-width: 80px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    vertical-align: middle;
-  }
-
-  .td-ot {
-    padding: 6px 4px;
-    font-size: 0.6rem;
-  }
-
-  .td-status {
-    padding: 6px 4px;
-  }
-
-  .td-status .status-pill {
-    font-size: 0.48rem !important;
-    padding: 2px 6px;
-  }
-
   .mgr-btn {
-    font-size: 0.45rem;
-    padding: 2px 4px;
-    min-height: 18px;
+    font-size: 0.5rem;
+    padding: 4px 7px;
+    min-height: 26px;
+    min-width: 28px;
   }
 
   .mgr-actions {
-    gap: 2px;
-    margin-left: 3px;
+    gap: 3px;
+    margin-left: 4px;
   }
 }
 
@@ -816,9 +842,13 @@ label {
 
 .admin-pin-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: clamp(8px, 2vw, 12px);
   align-items: end;
+}
+
+.admin-pin-layout button {
+  grid-column: 1 / -1;
 }
 
 .admin-pin-title {
@@ -836,7 +866,10 @@ label {
     margin-bottom: 8px;
   }
   .admin-pin-layout {
-    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .admin-pin-layout input {
+    padding: 12px 14px;
   }
 }
 

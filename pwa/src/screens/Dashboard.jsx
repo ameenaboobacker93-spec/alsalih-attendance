@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import {
   getCurrentMonth,
@@ -16,11 +16,10 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Fix modal state
-  const [fixModal, setFixModal] = useState({ visible: false, date: '', status: '', staffId: null, staffName: '' });
+  // Fix modal state — track which entries need fixing
+  const [fixModal, setFixModal] = useState({ visible: false, date: '', staffId: null, staffName: '', currentIn: '', currentOut: '' });
   const [fixIn, setFixIn] = useState('');
   const [fixOut, setFixOut] = useState('');
-  const [fixOT, setFixOT] = useState('');
 
   // Summary modal
   const [showSummary, setShowSummary] = useState(false);
@@ -28,37 +27,12 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState({ visible: false, id: null, date: '', staffName: '' });
 
-  // Today's summary state (branch-wide stats)
-  const [todaySummary, setTodaySummary] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-
   // Load dashboard when staff or month changes
   useEffect(() => {
     if (selectedStaff && selectedMonth) {
       loadDashboard();
     }
   }, [selectedStaff?.id, selectedMonth, refreshKey]);
-
-  // Load today's branch-wide summary
-  useEffect(() => {
-    loadTodaySummary();
-  }, [refreshKey, staffList.length]);
-
-  async function loadTodaySummary() {
-    setSummaryLoading(true);
-    try {
-      const statusList = await api.getOnDutyStatus();
-      const total = staffList.length;
-      const onDuty = statusList.filter(s => s.status === 'ON DUTY').length;
-      const checkedOut = statusList.filter(s => s.status === 'OFF').length;
-      const absent = Math.max(0, total - statusList.length);
-      setTodaySummary({ total, onDuty, checkedOut, absent });
-    } catch {
-      // Silent fail
-    } finally {
-      setSummaryLoading(false);
-    }
-  }
 
   async function loadDashboard() {
     if (!selectedStaff) return;
@@ -73,11 +47,12 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
     }
   }
 
-  function openFix(date, status) {
-    setFixModal({ visible: true, date, status, staffId: selectedStaff.id, staffName: selectedStaff.name });
+  function openFix(log) {
+    const currentIn = log.checkIn ? new Date(log.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    const currentOut = log.checkOut ? new Date(log.checkOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    setFixModal({ visible: true, date: log.date, staffId: selectedStaff.id, staffName: selectedStaff.name, currentIn, currentOut });
     setFixIn('');
     setFixOut('');
-    setFixOT('');
   }
 
   async function saveFix() {
@@ -87,8 +62,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         fixModal.staffName,
         fixModal.date,
         fixIn,
-        fixOut,
-        fixOT
+        fixOut
       );
       showToast('Entry fixed successfully');
       setFixModal({ ...fixModal, visible: false });
@@ -102,7 +76,6 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   async function handleApproveOT(log) {
     showLoading('Approving OT...');
     try {
-      // Calculate actual hours from check-in/check-out
       const checkIn = new Date(log.checkIn);
       const checkOut = new Date(log.checkOut);
       const diff = (checkOut - checkIn) / (1000 * 60 * 60);
@@ -139,6 +112,8 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
     }
   }
 
+
+
   // ── Delete Attendance ──
   function handleDeleteClick(log) {
     setDeleteConfirm({ visible: true, id: log.id, date: log.date, staffName: selectedStaff.name });
@@ -169,7 +144,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
     }
   }
 
-  // Filter out OFF_DAY and MISSING entries — show only actual attendance days
+  // Show all entries including OFF_DAY and MISSING, but filter for display purposes
   const activeLogs = dashboardData?.logs?.filter(l => l.status !== 'OFF_DAY' && l.status !== 'MISSING') || [];
 
   return (
@@ -224,37 +199,6 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         </div>
       </div>
 
-      {/* Today's Summary — Branch-wide stats */}
-      <div className="card today-summary-card" style={{ marginBottom: 16 }}>
-        <div className="section-title" style={{ marginBottom: 12 }}>
-          Today at a Glance
-        </div>
-        {summaryLoading && todaySummary === null ? (
-          <div className="today-summary-loading">Loading...</div>
-        ) : todaySummary ? (
-          <div className="today-summary-grid">
-            <div className="today-stat">
-              <div className="today-stat-num">{todaySummary.total}</div>
-              <div className="today-stat-lbl">Total Staff</div>
-            </div>
-            <div className="today-stat today-stat-on-duty">
-              <div className="today-stat-num">{todaySummary.onDuty}</div>
-              <div className="today-stat-lbl">🟢 On Duty</div>
-            </div>
-            <div className="today-stat today-stat-out">
-              <div className="today-stat-num">{todaySummary.checkedOut}</div>
-              <div className="today-stat-lbl">🔵 Checked Out</div>
-            </div>
-            <div className="today-stat today-stat-absent">
-              <div className="today-stat-num">{todaySummary.absent}</div>
-              <div className="today-stat-lbl">⚪ Absent</div>
-            </div>
-          </div>
-        ) : (
-          <div className="today-summary-loading">No data available</div>
-        )}
-      </div>
-
       {/* Summary Card */}
       {dashboardData && (
         <>
@@ -278,25 +222,25 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
             </button>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid-3" style={{ marginBottom: 16 }}>
-            <div className="stat-card">
+          {/* Stats Grid — compact cards */}
+          <div className="grid-3 dashboard-stats" style={{ marginBottom: 16 }}>
+            <div className="stat-card compact">
               <div className="num" style={{ color: '#06b6d4' }}>{dashboardData.summary.totalOt}</div>
               <div className="lbl">Total OT</div>
             </div>
-            <div className="stat-card">
-              <div className="num" style={{ color: '#f59e0b' }}>{dashboardData.summary.totalComp}</div>
-              <div className="lbl">Compensated</div>
-            </div>
-            <div className="stat-card">
+            <div className="stat-card compact">
               <div className="num" style={{ color: '#a78bfa' }}>{dashboardData.summary.offDays}</div>
               <div className="lbl">Off Days</div>
+            </div>
+            <div className="stat-card compact">
+              <div className="num" style={{ color: '#f59e0b' }}>{dashboardData.summary.netOt}</div>
+              <div className="lbl">Net Payable</div>
             </div>
           </div>
 
           {/* Table — only shows days with actual attendance entries */}
           {activeLogs.length > 0 && (
-            <div className="card dashboard-table-card" style={{ padding: 'clamp(8px, 1.5vw, 20px)' }}>
+            <div className="card dashboard-table-card">
               <div className="responsive-table dashboard-table">
                 <table>
                   <thead>
@@ -335,21 +279,21 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
                                     className="mgr-btn approve"
                                     title="Approve OT"
                                   >
-                                    ✓ OT
+                                    ✓
                                   </button>
                                   <button
                                     onClick={() => handleRejectOT(log)}
                                     className="mgr-btn reject"
                                     title="Reject OT"
                                   >
-                                    ✗ No
+                                    ✗
                                   </button>
                                 </>
                               )}
                               {/* INCOMPLETE → Fix times */}
                               {log.status === 'INCOMPLETE' && (
                                 <button
-                                  onClick={() => openFix(log.date, log.status)}
+                                  onClick={() => openFix(log)}
                                   className="mgr-btn fix"
                                 >
                                   FIX
@@ -401,34 +345,47 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         <div className="card" style={{ textAlign: 'center', opacity: 0.5, padding: 'clamp(30px, 8vw, 50px)' }}>
           <p style={{ fontSize: '0.85rem' }}>Select a staff member and month to view dashboard</p>
         </div>
-      )}
-
-      {/* Summary Modal */}
-      <div className={`modal-overlay ${showSummary ? 'show' : ''}`} onClick={() => setShowSummary(false)}>
-        <div className="modal-body" onClick={e => e.stopPropagation()}>
-          <h3 style={{ marginTop: 0, color: '#06b6d4', marginBottom: 16, fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
-            {formatMonthDisplay(selectedMonth)} Summary
-          </h3>
-          <div style={{ lineHeight: 2.2 }}>
-            <div className="grid-2" style={{ gap: 12 }}><span>Total OT:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.totalOt} hrs</b></div>
-            <div className="grid-2" style={{ gap: 12 }}><span>Compensated:</span><b style={{ textAlign: 'right', color: '#ef4444' }}>{dashboardData?.summary.totalComp} hrs</b></div>
-            <div className="grid-2" style={{ gap: 12 }}><span>Off Days:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.offDays}</b></div>
-            <hr style={{ border: 0, borderTop: '1px solid #333', margin: '8px 0' }} />
-            <div className="grid-2" style={{ gap: 12 }}><span>Net Payable:</span><b style={{ textAlign: 'right', color: '#10b981', fontSize: 'clamp(1.1rem, 2.5vw, 1.2rem)' }}>{dashboardData?.summary.netOt} hrs</b></div>
-            <div className="grid-2" style={{ gap: 12 }}><span>Status:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.status}</b></div>
+      )}          {/* Summary Modal */}
+          <div className={`modal-overlay ${showSummary ? 'show' : ''}`} onClick={() => setShowSummary(false)}>
+            <div className="modal-body" onClick={e => e.stopPropagation()}>
+              <h3 style={{ marginTop: 0, color: '#06b6d4', marginBottom: 16, fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
+                {formatMonthDisplay(selectedMonth)} Summary
+              </h3>
+              <div style={{ lineHeight: 2.2 }}>
+                <div className="grid-2" style={{ gap: 12 }}><span>Total OT:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.totalOt} hrs</b></div>
+                <div className="grid-2" style={{ gap: 12 }}><span>Off Days:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.offDays}</b></div>
+                <hr style={{ border: 0, borderTop: '1px solid #333', margin: '8px 0' }} />
+                <div className="grid-2" style={{ gap: 12 }}><span>Net Payable:</span><b style={{ textAlign: 'right', color: '#10b981', fontSize: 'clamp(1.1rem, 2.5vw, 1.2rem)' }}>{dashboardData?.summary.netOt} hrs</b></div>
+                <div className="grid-2" style={{ gap: 12 }}><span>Status:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.status}</b></div>
+              </div>
+              <button className="btn-primary slate" style={{ marginTop: 20, padding: 12 }} onClick={() => setShowSummary(false)}>
+                CLOSE
+              </button>
+            </div>
           </div>
-          <button className="btn-primary slate" style={{ marginTop: 20, padding: 12 }} onClick={() => setShowSummary(false)}>
-            CLOSE
-          </button>
-        </div>
-      </div>
 
-      {/* Fix Modal (for INCOMPLETE entries — fix check-in/check-out times) */}
+      {/* Fix Modal — edit only the missing entry (check-in OR check-out) */}
       <div className={`modal-overlay ${fixModal.visible ? 'show' : ''}`} onClick={() => setFixModal({ ...fixModal, visible: false })}>
         <div className="modal-body" onClick={e => e.stopPropagation()}>
-          <h3 style={{ marginTop: 0, fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>Fix Entry — {fixModal.date}</h3>
-          <input type="time" value={fixIn} onChange={e => setFixIn(e.target.value)} placeholder="Check In" />
-          <input type="time" value={fixOut} onChange={e => setFixOut(e.target.value)} placeholder="Check Out" style={{ marginTop: 8 }} />
+          <h3 style={{ marginTop: 0, color: '#06b6d4', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>Fix Entry — {fixModal.date}</h3>
+          <p style={{ fontSize: '0.65rem', opacity: 0.6, marginBottom: 16 }}>
+            Fill in only the missing field. The other field will remain unchanged.
+          </p>
+          <label>Check In <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentIn || 'missing'})</span></label>
+          <input
+            type="time"
+            value={fixIn}
+            onChange={e => setFixIn(e.target.value)}
+            placeholder={fixModal.currentIn || 'Enter check-in time'}
+          />
+          <label style={{ marginTop: 12 }}>Check Out <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentOut || 'missing'})</span></label>
+          <input
+            type="time"
+            value={fixOut}
+            onChange={e => setFixOut(e.target.value)}
+            placeholder={fixModal.currentOut || 'Enter check-out time'}
+            style={{ marginTop: 4 }}
+          />
           <div className="grid-2" style={{ marginTop: 16, gap: 8 }}>
             <button className="btn-primary slate" style={{ padding: 12 }} onClick={() => setFixModal({ ...fixModal, visible: false })}>
               CANCEL

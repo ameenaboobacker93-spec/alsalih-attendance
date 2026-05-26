@@ -294,7 +294,7 @@ export function useStaffApi(branchId) {
     });
 
     // Build daily log array
-    let calcOt = 0, calcComp = 0, offCount = 0;
+    let calcOt = 0, offCount = 0;
     const dailyLogs = [];
 
     for (let d = new Date(startDate); d <= loopEnd; d.setDate(d.getDate() + 1)) {
@@ -310,13 +310,12 @@ export function useStaffApi(branchId) {
       let otVal = 0;
       let status = '';
 
-      // Check if roster says off day
-      if (rosterEntry?.is_off_day) {
+      // Off day: only when roster explicitly marks as off day AND no entries exist
+      if (rosterEntry?.is_off_day && !checkIn && !checkOut) {
         status = 'OFF_DAY';
         offCount++;
       } else if (!checkIn && !checkOut) {
-        status = rosterEntry ? 'MISSING' : 'OFF_DAY';
-        if (status === 'OFF_DAY') offCount++;
+        status = 'MISSING';
       } else if (!checkIn || !checkOut) {
         status = 'INCOMPLETE';
       } else {
@@ -327,13 +326,12 @@ export function useStaffApi(branchId) {
           otVal = parseFloat(otAdj.ot_value);
           status = otVal > 0 ? 'OT_APPROVED' : 'NORMAL';
           if (otVal > 0) calcOt += otVal;
-        } else if (actualHours >= (dutyHrs + 0.5)) {
-          status = 'PENDING_APPROVAL';
-        } else if (actualHours < dutyHrs) {
+        } else if (actualHours > dutyHrs) {
+          // OT: when staff works more than their duty hours
           otVal = actualHours - dutyHrs;
-          status = 'COMPENSATED';
-          calcComp += Math.abs(otVal);
+          status = 'PENDING_APPROVAL';
         } else {
+          // Normal or reduced hours — no action needed
           status = 'NORMAL';
         }
       }
@@ -361,7 +359,6 @@ export function useStaffApi(branchId) {
       logs: dailyLogs,
       summary: {
         totalOt: calcOt.toFixed(2),
-        totalComp: calcComp.toFixed(2),
         offDays: offCount,
         netOt: settlement ? parseFloat(settlement.net_ot).toFixed(2) : '---',
         status: settlement ? settlement.status : 'PENDING',
@@ -386,37 +383,58 @@ export function useStaffApi(branchId) {
     return true;
   }
 
-  // ── Manager Fix ──
-  async function managerFixEntry(staffId, staffName, date, mIn, mOut, mOT) {
-    const monthLabel = new Date(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  // ── Manager Fix Entry (updates attendance_logs directly) ──
+  async function managerFixEntry(staffId, staffName, date, mIn, mOut) {
     const [y, M, d] = date.split('-').map(Number);
 
-    let fIn = null, fOut = null;
+    // Build update object with only the fields that are provided
+    const updates = {};
     if (mIn) {
       const [h, min] = mIn.split(':').map(Number);
-      fIn = new Date(y, M - 1, d, h, min);
+      updates.check_in = new Date(y, M - 1, d, h, min).toISOString();
     }
     if (mOut) {
       const [h, min] = mOut.split(':').map(Number);
-      fOut = new Date(y, M - 1, d, h, min);
+      updates.check_out = new Date(y, M - 1, d, h, min).toISOString();
     }
 
-    const { error } = await supabase
-      .from('ot_payments')
-      .insert({
-        staff_id: staffId,
-        branch_id: branchId,
-        month: monthLabel,
-        ot_value: parseFloat(mOT) || 0,
-        date,
-        type: 'MANUAL_FIX',
-        status: 'Verified',
-        check_in: fIn,
-        check_out: fOut,
-      });
+    if (Object.keys(updates).length === 0) {
+      throw new Error('No changes provided');
+    }
 
-    if (error) throw error;
-    await logAudit(staffName, 'ENTRY FIX', `${staffName} — ${date} fixed`);
+    // Check if entry exists for this staff + date
+    const dateKey = new Date(y, M - 1, d).toISOString().split('T')[0];
+    const { data: existing } = await supabase
+      .from('attendance_logs')
+      .select('id')
+      .eq('staff_id', staffId)
+      .eq('date', dateKey)
+      .limit(1);
+
+    const hasExisting = existing && existing.length > 0;
+
+    if (hasExisting) {
+      // Update the existing entry with only the provided fields
+      const { error } = await supabase
+        .from('attendance_logs')
+        .update(updates)
+        .eq('id', existing[0].id);
+      if (error) throw error;
+    } else {
+      // Create a new entry with the provided fields
+      const { error } = await supabase
+        .from('attendance_logs')
+        .insert({
+          staff_id: staffId,
+          branch_id: branchId,
+          date: dateKey,
+          status: 'INCOMPLETE',
+          ...updates,
+        });
+      if (error) throw error;
+    }
+
+    await logAudit(staffName, 'ENTRY FIX', `${staffName} — ${date} fixed (${Object.keys(updates).join(', ')})`);
     return true;
   }
 
@@ -563,7 +581,7 @@ export function useStaffApi(branchId) {
     });
     csv += '\nSummary\n';
     csv += `Total OT Hrs,${data.summary.totalOt}\n`;
-    csv += `Compensated Hrs,${data.summary.totalComp}\n`;
+
     csv += `Off Days,${data.summary.offDays}\n`;
     csv += `Net Payable OT,${data.summary.netOt}\n`;
     csv += `Status,${data.summary.status}\n`;
@@ -604,7 +622,7 @@ export function useStaffApi(branchId) {
         data.logs.forEach(l => {
           block += `"${staff.name}",${l.displayDate},"${l.shift}",${l.otValue},${l.status}\n`;
         });
-        block += `"${staff.name} NET","OT: ${data.summary.totalOt} | Comp: ${data.summary.totalComp} | Off: ${data.summary.offDays} | Payable: ${data.summary.netOt} (${data.summary.status})",,,\n\n`;
+        block += `"${staff.name} NET","OT: ${data.summary.totalOt} | Off: ${data.summary.offDays} | Payable: ${data.summary.netOt} (${data.summary.status})",,,\n\n`;
         return block;
       })
     );

@@ -10,9 +10,10 @@ export default function PullToRefresh({ onRefresh, children, disabled = false })
 
   const handleTouchStart = useCallback((e) => {
     if (disabled) return;
-    // Only activate if at the very top of the container
-    const scrollTop = containerRef.current?.scrollTop ?? 0;
-    if (scrollTop <= 0) {
+    // Only activate if the page itself is scrolled to the very top
+    // Use window.scrollY so scrolling inside child containers (like dashboard table) doesn't trigger pull-to-refresh
+    const pageScrollTop = window.scrollY || window.pageYOffset || 0;
+    if (pageScrollTop <= 0) {
       touchStartY.current = e.touches[0].clientY;
       isPulling.current = false;
       pullDistanceRef.current = 0;
@@ -23,9 +24,8 @@ export default function PullToRefresh({ onRefresh, children, disabled = false })
     if (disabled || pullState === 'refreshing') return;
     const dy = e.touches[0].clientY - touchStartY.current;
     if (dy > 0) {
-      // Pulling down
-      const scrollTop = containerRef.current?.scrollTop ?? 0;
-      if (scrollTop <= 0) {
+      // Pulling down        const pageScrollTop = window.scrollY || window.pageYOffset || 0;
+        if (pageScrollTop <= 0) {
         isPulling.current = true;
         // Stop propagation to prevent tab swipe from firing
         e.stopPropagation();
