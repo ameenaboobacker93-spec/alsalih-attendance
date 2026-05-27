@@ -50,10 +50,7 @@ export default function DutyRoster({ branch, staffList, api, isManager, refreshK
       const date = new Date(year, month - 1, day);
       if (date > today) break;
       const dateKey = date.toLocaleDateString('en-CA');
-      const rosterEntry = rosterData.find(r => {
-        const rDate = new Date(r.date).toLocaleDateString('en-CA');
-        return rDate === dateKey;
-      });
+      const rosterEntry = rosterData.find(r => r.date === dateKey);
 
       days.push({
         date: dateKey,

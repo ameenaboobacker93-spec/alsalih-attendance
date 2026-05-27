@@ -84,6 +84,7 @@
 }
 
 .light-theme .status-ot { background: #dbeafe; color: #1e40af; }
+.light-theme .status-rejected { background: #fee2e2; color: #b91c1c; }
 .light-theme .status-off { background: #fee2e2; color: #b91c1c; }
 .light-theme .status-pending { background: #fef3c7; color: #b45309; }
 .light-theme .status-incomplete { background: #f1f5f9; color: #475569; }
@@ -160,6 +161,17 @@
 /* ── Light Theme: Mgr action buttons ── */
 .light-theme .mgr-btn.reject {
   background: #94a3b8;
+}
+
+.light-theme .mgr-btn.delete {
+  opacity: 1;
+  background: #dc2626;
+}
+
+/* ── Light Theme: Slate buttons (CLOSE, CANCEL) need dark text ── */
+.light-theme .btn-primary.slate {
+  background: #cbd5e1;
+  color: #0f172a;
 }
 
 /* ── Light Theme: Fix button ── */
@@ -461,6 +473,7 @@ label {
 }
 
 .status-ot { background: #1e3a8a; color: #fff; }
+.status-rejected { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .status-off { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .status-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
 .status-incomplete { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }

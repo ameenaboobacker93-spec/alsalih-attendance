@@ -72,6 +72,7 @@ export function downloadCSV(csv, filename) {
 export function getStatusClass(status) {
   switch (status) {
     case 'OT_APPROVED': return 'status-ot';
+    case 'OT_REJECTED': return 'status-rejected';
     case 'OFF_DAY': return 'status-off';
     case 'PENDING_APPROVAL': return 'status-pending';
     case 'INCOMPLETE': return 'status-incomplete';
@@ -85,6 +86,7 @@ export function getStatusClass(status) {
 export function getStatusLabel(status) {
   switch (status) {
     case 'OT_APPROVED': return 'OT APPROVED';
+    case 'OT_REJECTED': return 'OT REJECTED';
     case 'OFF_DAY': return 'OFF DAY';
     case 'PENDING_APPROVAL': return 'PENDING APPROVAL';
     case 'INCOMPLETE': return 'INCOMPLETE';

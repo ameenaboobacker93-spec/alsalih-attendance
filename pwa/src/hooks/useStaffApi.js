@@ -89,9 +89,7 @@ export function useStaffApi(branchId) {
   // ── Attendance (upsert — checks for existing entry on same date) ──
   async function processAttendance(staffId, staffName, type, dateStr) {
     const now = new Date();
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const punchDate = new Date(y, m - 1, d);
-    const dateKey = punchDate.toISOString().split('T')[0];
+    const dateKey = dateStr;
 
     // Check if entry exists for this staff + date
     const { data: existing, error: queryErr } = await supabase
@@ -108,7 +106,10 @@ export function useStaffApi(branchId) {
 
     if (type === 'START SHIFT') {
       if (hasExisting) {
-        // Update existing entry with check-in time
+        // Lock first check-in — don't overwrite if already set
+        if (existing[0].check_in) {
+          throw new Error('Already checked in today');
+        }
         const { error: updErr } = await supabase
           .from('attendance_logs')
           .update({ check_in: now, status: 'INCOMPLETE' })
@@ -130,7 +131,10 @@ export function useStaffApi(branchId) {
     } else {
       // END SHIFT
       if (hasExisting) {
-        // Update existing entry with check-out time
+        // Lock first check-out — don't overwrite if already set
+        if (existing[0].check_out) {
+          throw new Error('Already checked out today');
+        }
         const { error: updErr } = await supabase
           .from('attendance_logs')
           .update({ check_out: now })
@@ -225,30 +229,36 @@ export function useStaffApi(branchId) {
     if (staffErr) throw staffErr;
 
     const dutyHrs = parseFloat(staffData.duty_hours) || 9;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
     // Generate all dates in month
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
+    const startDateStr = startDate.toLocaleDateString('en-CA');
+    const endDateStr = endDate.toLocaleDateString('en-CA');
+
+    // Cutoff: don't show future dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const loopEnd = today < endDate && today >= startDate ? today : endDate;
+    const loopEndStr = loopEnd.toLocaleDateString('en-CA');
 
     // Get attendance logs for this staff/month
     const { data: logs, error: logsErr } = await supabase
       .from('attendance_logs')
       .select('*')
       .eq('staff_id', staffId)
-      .gte('date', startDate.toISOString().split('T')[0])
-      .lte('date', loopEnd.toISOString().split('T')[0]);
+      .gte('date', startDateStr)
+      .lte('date', loopEndStr);
 
     if (logsErr) throw logsErr;
 
-    // Get OT adjustments
+    // Get OT adjustments — query by date range (month label format mismatch fix)
     const { data: otAdjustments, error: otErr } = await supabase
       .from('ot_payments')
       .select('*')
       .eq('staff_id', staffId)
-      .eq('month', selectedMonth);
+      .gte('date', startDateStr)
+      .lte('date', loopEndStr);
 
     if (otErr) throw otErr;
 
@@ -257,8 +267,8 @@ export function useStaffApi(branchId) {
       .from('duty_roster')
       .select('*')
       .eq('staff_id', staffId)
-      .gte('date', startDate.toISOString().split('T')[0])
-      .lte('date', loopEnd.toISOString().split('T')[0]);
+      .gte('date', startDateStr)
+      .lte('date', loopEndStr);
 
     if (rosterErr) throw rosterErr;
 
@@ -271,27 +281,24 @@ export function useStaffApi(branchId) {
 
     if (settleErr) throw settleErr;
 
-    // Map logs by date
+    // Map logs by date (date field from Supabase DATE type is already 'YYYY-MM-DD')
     const logMap = {};
     (logs || []).forEach(log => {
-      const dKey = new Date(log.date).toLocaleDateString('en-CA');
-      logMap[dKey] = log;
+      logMap[log.date] = log;
     });
 
-    // Map OT adjustments by date
+    // Map OT adjustments by date (date field from Supabase DATE type is already 'YYYY-MM-DD')
     const otMap = {};
     (otAdjustments || []).forEach(ot => {
       if (ot.date) {
-        const dKey = new Date(ot.date).toLocaleDateString('en-CA');
-        otMap[dKey] = ot;
+        otMap[ot.date] = ot;
       }
     });
 
-    // Map roster by date
+    // Map roster by date (date field from Supabase DATE type is already 'YYYY-MM-DD')
     const rosterMap = {};
     (roster || []).forEach(r => {
-      const dKey = new Date(r.date).toLocaleDateString('en-CA');
-      rosterMap[dKey] = r;
+      rosterMap[r.date] = r;
     });
 
     // Build daily log array
@@ -326,8 +333,16 @@ export function useStaffApi(branchId) {
 
         if (otAdj && otAdj.ot_value != null) {
           otVal = parseFloat(otAdj.ot_value);
-          status = otVal > 0 ? 'OT_APPROVED' : (actualHours < dutyHrs ? 'COMPENSATED' : 'NORMAL');
-          if (otVal > 0) calcOt += otVal;
+          // Check the status field for approved vs rejected
+          if (otAdj.status === 'Rejected') {
+            status = 'OT_REJECTED';
+          } else if (otVal > 0) {
+            status = 'OT_APPROVED';
+            calcOt += otVal;
+          } else {
+            // Verified but ot_value is 0 — treat as normal/compensated
+            status = actualHours < dutyHrs ? 'COMPENSATED' : 'NORMAL';
+          }
         } else if (actualHours > dutyHrs) {
           // OT: when staff works more than their duty hours
           otVal = actualHours - dutyHrs;
@@ -394,25 +409,38 @@ export function useStaffApi(branchId) {
 
   // ── Manager Fix Entry (updates attendance_logs directly) ──
   async function managerFixEntry(staffId, staffName, date, mIn, mOut) {
-    const [y, M, d] = date.split('-').map(Number);
+    const dateKey = date;
 
     // Build update object with only the fields that are provided
     const updates = {};
     if (mIn) {
       const [h, min] = mIn.split(':').map(Number);
-      updates.check_in = new Date(y, M - 1, d, h, min).toISOString();
+      updates.check_in = new Date(dateKey + 'T' + mIn + ':00').toISOString();
     }
     if (mOut) {
       const [h, min] = mOut.split(':').map(Number);
-      updates.check_out = new Date(y, M - 1, d, h, min).toISOString();
+      // If check-out time is before check-in time, it means the shift crosses midnight
+      // e.g., check-in at 15:00 and check-out at 03:00 means checkout is on the next day
+      if (mIn) {
+        const [inH, inMin] = mIn.split(':').map(Number);
+        const inTotal = inH * 60 + inMin;
+        const outTotal = h * 60 + min;
+        if (outTotal < inTotal) {
+          // Check-out is on the next day
+          const checkOutDate = new Date(dateKey + 'T' + mOut + ':00');
+          checkOutDate.setDate(checkOutDate.getDate() + 1);
+          updates.check_out = checkOutDate.toISOString();
+        } else {
+          updates.check_out = new Date(dateKey + 'T' + mOut + ':00').toISOString();
+        }
+      } else {
+        updates.check_out = new Date(dateKey + 'T' + mOut + ':00').toISOString();
+      }
     }
 
     if (Object.keys(updates).length === 0) {
       throw new Error('No changes provided');
     }
-
-    // Check if entry exists for this staff + date
-    const dateKey = new Date(y, M - 1, d).toISOString().split('T')[0];
     const { data: existing } = await supabase
       .from('attendance_logs')
       .select('id')
@@ -470,8 +498,8 @@ export function useStaffApi(branchId) {
 
   async function getDutyRoster(staffId, month) {
     const [year, monthNum] = month.split('-').map(Number);
-    const startDate = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
-    const endDate = new Date(year, monthNum, 0).toISOString().split('T')[0];
+    const startDate = new Date(year, monthNum - 1, 1).toLocaleDateString('en-CA');
+    const endDate = new Date(year, monthNum, 0).toLocaleDateString('en-CA');
 
     const { data, error } = await supabase
       .from('duty_roster')
@@ -610,7 +638,7 @@ export function useStaffApi(branchId) {
 
     let csv = 'Date,Check In,Check Out,Hours,OT,Status\n';
     (data || []).forEach(log => {
-      const d = new Date(log.date).toLocaleDateString('en-CA');
+      const d = log.date;
       const tIn = log.check_in ? new Date(log.check_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
       const tOut = log.check_out ? new Date(log.check_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
       csv += `${d},${tIn},${tOut},${log.total_hours || ''},${log.ot_value || ''},${log.status}\n`;
