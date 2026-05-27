@@ -235,21 +235,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
             </button>
           </div>
 
-          {/* Stats Grid — compact cards */}
-          <div className="grid-3 dashboard-stats" style={{ marginBottom: 16 }}>
-            <div className="stat-card compact">
-              <div className="num" style={{ color: 'var(--accent)' }}>{dashboardData.summary.totalOt}</div>
-              <div className="lbl">Total OT</div>
-            </div>
-            <div className="stat-card compact">
-              <div className="num" style={{ color: '#a78bfa' }}>{dashboardData.summary.offDays}</div>
-              <div className="lbl">Off Days</div>
-            </div>
-            <div className="stat-card compact">
-              <div className="num" style={{ color: '#f59e0b' }}>{dashboardData.summary.netOt}</div>
-              <div className="lbl">Net Payable</div>
-            </div>
-          </div>
+
 
           {/* Table — only shows days with actual attendance entries */}
           {activeLogs.length > 0 && (
