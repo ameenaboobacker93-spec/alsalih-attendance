@@ -190,6 +190,15 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
           </div>
         </div>
 
+        {dashboardData && (
+          <button
+            className="btn-sm"
+            style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', marginRight: 8, marginTop: 'clamp(10px, 2vw, 14px)' }}
+            onClick={() => setShowSummary(true)}
+          >
+            📊 Summary
+          </button>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 'clamp(10px, 2vw, 14px)', flexWrap: 'wrap' }}>
           <button className="btn-sm" style={{ background: 'var(--accent)' }} onClick={handleExport}>
             📥 Export CSV
@@ -212,32 +221,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         </div>
       </div>
 
-      {/* Summary Card */}
-      {dashboardData && (
-        <>
-          <div className="card" style={{ marginBottom: 16, textAlign: 'center', padding: 'clamp(16px, 3vw, 24px)' }}>
-            <small style={{ color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', fontSize: 'clamp(0.55rem, 1.5vw, 0.65rem)' }}>
-              {formatMonthDisplay(selectedMonth)} ({dashboardData.summary.status})
-            </small>
-            <div style={{
-              fontSize: 'clamp(1.8rem, 5vw, 2.2rem)',
-              fontWeight: 800,
-              marginTop: 4,
-            }}>
-              {dashboardData.summary.netOt} h
-            </div>
-            <button
-              className="btn-sm"
-              style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', marginTop: 8 }}
-              onClick={() => setShowSummary(true)}
-            >
-              VIEW SUMMARY
-            </button>
-          </div>
-
-
-
-          {/* Table — only shows days with actual attendance entries */}
+      {/* Table — only shows days with actual attendance entries */}
           {activeLogs.length > 0 && (
             <div className="card dashboard-table-card">
               <div className="responsive-table dashboard-table">
@@ -334,8 +318,6 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
               </small>
             </div>
           )}
-        </>
-      )}
 
       {loading && (
         <div style={{ textAlign: 'center', padding: 'clamp(30px, 8vw, 50px)' }}>
