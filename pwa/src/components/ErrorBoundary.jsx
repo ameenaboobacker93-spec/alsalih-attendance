@@ -23,8 +23,8 @@ export default class ErrorBoundary extends React.Component {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0f172a',
-          color: '#f8fafc',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
           padding: 40,
           textAlign: 'center',
         }}>
@@ -53,7 +53,7 @@ export default class ErrorBoundary extends React.Component {
             style={{
               padding: '14px 32px',
               borderRadius: 12,
-              background: '#06b6d4',
+              background: 'var(--accent)',
               color: 'white',
               border: 'none',
               fontWeight: 800,

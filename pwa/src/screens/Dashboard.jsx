@@ -178,7 +178,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 'clamp(10px, 2vw, 14px)', flexWrap: 'wrap' }}>
-          <button className="btn-sm" style={{ background: '#06b6d4' }} onClick={handleExport}>
+          <button className="btn-sm" style={{ background: 'var(--accent)' }} onClick={handleExport}>
             📥 Export CSV
           </button>
           <button className="btn-sm" style={{ background: '#3b82f6' }} onClick={async () => {
@@ -203,7 +203,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
       {dashboardData && (
         <>
           <div className="card" style={{ marginBottom: 16, textAlign: 'center', padding: 'clamp(16px, 3vw, 24px)' }}>
-            <small style={{ color: '#06b6d4', fontWeight: 800, textTransform: 'uppercase', fontSize: 'clamp(0.55rem, 1.5vw, 0.65rem)' }}>
+            <small style={{ color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', fontSize: 'clamp(0.55rem, 1.5vw, 0.65rem)' }}>
               {formatMonthDisplay(selectedMonth)} ({dashboardData.summary.status})
             </small>
             <div style={{
@@ -215,7 +215,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
             </div>
             <button
               className="btn-sm"
-              style={{ background: 'none', border: '1px solid #06b6d4', color: '#06b6d4', marginTop: 8 }}
+              style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', marginTop: 8 }}
               onClick={() => setShowSummary(true)}
             >
               VIEW SUMMARY
@@ -225,7 +225,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
           {/* Stats Grid — compact cards */}
           <div className="grid-3 dashboard-stats" style={{ marginBottom: 16 }}>
             <div className="stat-card compact">
-              <div className="num" style={{ color: '#06b6d4' }}>{dashboardData.summary.totalOt}</div>
+              <div className="num" style={{ color: 'var(--accent)' }}>{dashboardData.summary.totalOt}</div>
               <div className="lbl">Total OT</div>
             </div>
             <div className="stat-card compact">
@@ -340,8 +340,8 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
 
       {loading && (
         <div style={{ textAlign: 'center', padding: 'clamp(30px, 8vw, 50px)' }}>
-          <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: '#06b6d4', borderBottomColor: 'transparent' }} />
-          <p style={{ color: '#06b6d4', fontSize: '0.7rem', marginTop: 12 }}>LOADING...</p>
+          <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: 'var(--accent)', borderBottomColor: 'transparent' }} />
+          <p style={{ color: 'var(--accent)', fontSize: '0.7rem', marginTop: 12 }}>LOADING...</p>
         </div>
       )}
 
@@ -352,13 +352,13 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
       )}          {/* Summary Modal */}
           <div className={`modal-overlay ${showSummary ? 'show' : ''}`} onClick={() => setShowSummary(false)}>
             <div className="modal-body" onClick={e => e.stopPropagation()}>
-              <h3 style={{ marginTop: 0, color: '#06b6d4', marginBottom: 16, fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
+              <h3 style={{ marginTop: 0, color: 'var(--accent)', marginBottom: 16, fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
                 {formatMonthDisplay(selectedMonth)} Summary
               </h3>
               <div style={{ lineHeight: 2.2 }}>
                 <div className="grid-2" style={{ gap: 12 }}><span>Total OT:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.totalOt} hrs</b></div>
                 <div className="grid-2" style={{ gap: 12 }}><span>Off Days:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.offDays}</b></div>
-                <hr style={{ border: 0, borderTop: '1px solid #333', margin: '8px 0' }} />
+                <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: '8px 0' }} />
                 <div className="grid-2" style={{ gap: 12 }}><span>Net Payable:</span><b style={{ textAlign: 'right', color: '#10b981', fontSize: 'clamp(1.1rem, 2.5vw, 1.2rem)' }}>{dashboardData?.summary.netOt} hrs</b></div>
                 <div className="grid-2" style={{ gap: 12 }}><span>Status:</span><b style={{ textAlign: 'right' }}>{dashboardData?.summary.status}</b></div>
               </div>
@@ -371,7 +371,7 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
       {/* Fix Modal — edit only the missing entry (check-in OR check-out) */}
       <div className={`modal-overlay ${fixModal.visible ? 'show' : ''}`} onClick={() => setFixModal({ ...fixModal, visible: false })}>
         <div className="modal-body" onClick={e => e.stopPropagation()}>
-          <h3 style={{ marginTop: 0, color: '#06b6d4', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>Fix Entry — {fixModal.date}</h3>
+          <h3 style={{ marginTop: 0, color: 'var(--accent)', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>Fix Entry — {fixModal.date}</h3>
           <p style={{ fontSize: '0.65rem', opacity: 0.6, marginBottom: 16 }}>
             Fill in only the missing field. The other field will remain unchanged.
           </p>

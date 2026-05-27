@@ -164,7 +164,7 @@ export default function DutyRoster({ branch, staffList, api, isManager, refreshK
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: 'clamp(30px, 8vw, 50px)' }}>
-              <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: '#06b6d4', borderBottomColor: 'transparent' }} />
+              <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: 'var(--accent)', borderBottomColor: 'transparent' }} />
             </div>
           ) : (
             <div className="card" style={{ padding: 'clamp(10px, 1.5vw, 16px)' }}>
@@ -213,7 +213,7 @@ export default function DutyRoster({ branch, staffList, api, isManager, refreshK
       {/* Roster Editor Modal */}
       <div className={`modal-overlay ${showEditor ? 'show' : ''}`} onClick={() => setShowEditor(false)}>
         <div className="modal-body" onClick={e => e.stopPropagation()}>
-          <h3 style={{ marginTop: 0, color: '#06b6d4', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
+          <h3 style={{ marginTop: 0, color: 'var(--accent)', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
             Roster — {editDate}
           </h3>
 
@@ -274,7 +274,7 @@ export default function DutyRoster({ branch, staffList, api, isManager, refreshK
                   padding: 10,
                   fontSize: 'clamp(0.6rem, 1.4vw, 0.7rem)',
                   color: '#a78bfa',
-                }}>
+                }} className="roster-split-info">
                   💡 Split shift example: Staff works 9:00-13:00 and 16:00-21:00.
                   The system will calculate total hours across both segments.
                 </div>

@@ -145,7 +145,7 @@ export default function Portal() {
             style={{
               background: 'none',
               border: 'none',
-              color: '#06b6d4',
+              color: 'var(--accent)',
               fontSize: 'clamp(1rem, 3vw, 1.2rem)',
               padding: '4px 8px',
               cursor: 'pointer',
@@ -166,7 +166,7 @@ export default function Portal() {
           </div>
         </div>
         <span style={{
-          color: '#06b6d4',
+          color: 'var(--accent)',
           fontSize: 'clamp(0.55rem, 1.5vw, 0.65rem)',
           letterSpacing: 3,
           textTransform: 'uppercase',
@@ -174,13 +174,11 @@ export default function Portal() {
         }}>
           Attendance Portal
         </span>
-        <div id="clock" style={{
+        <div id="clock" className="clock-widget" style={{
           fontSize: 'clamp(1.5rem, 5vw, 2rem)',
           fontWeight: 300,
           padding: 'clamp(6px, 1.5vw, 8px) clamp(20px, 6vw, 32px)',
           borderRadius: 50,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.1)',
           margin: 'clamp(8px, 2vw, 12px) auto 0',
           display: 'inline-block',
           fontVariantNumeric: 'tabular-nums',
@@ -289,7 +287,7 @@ export default function Portal() {
           }}>
             🔐
           </div>
-          <h3 style={{ marginTop: 0, color: '#06b6d4', fontSize: 'clamp(0.9rem, 2.5vw, 1rem)' }}>
+          <h3 style={{ marginTop: 0, color: 'var(--accent)', fontSize: 'clamp(0.9rem, 2.5vw, 1rem)' }}>
             ADMIN ACCESS
           </h3>
           <p style={{

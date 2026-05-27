@@ -75,7 +75,7 @@ export default function BranchSelector() {
           AL SALIH PHARMACY
         </h1>
         <p style={{
-          color: '#06b6d4',
+          color: 'var(--accent)',
           fontSize: 'clamp(0.6rem, 1.8vw, 0.75rem)',
           letterSpacing: 4,
           textTransform: 'uppercase',
@@ -89,8 +89,8 @@ export default function BranchSelector() {
       {/* Loading */}
       {loading && (
         <div style={{ textAlign: 'center' }}>
-          <div className="loader" style={{ width: 32, height: 32, borderWidth: 3, borderColor: '#06b6d4', borderBottomColor: 'transparent' }} />
-          <p style={{ color: '#06b6d4', fontSize: '0.75rem', marginTop: 12, letterSpacing: 1 }}>
+          <div className="loader" style={{ width: 32, height: 32, borderWidth: 3, borderColor: 'var(--accent)', borderBottomColor: 'transparent' }} />
+          <p style={{ color: 'var(--accent)', fontSize: '0.75rem', marginTop: 12, letterSpacing: 1 }}>
             Loading branches...
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function BranchSelector() {
                 minHeight: 'var(--touch-min)',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#06b6d4';
+                e.currentTarget.style.borderColor = 'var(--accent)';
                 e.currentTarget.style.background = 'var(--accent-dim)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.boxShadow = '0 8px 24px rgba(6, 182, 212, 0.15)';
@@ -180,7 +180,7 @@ export default function BranchSelector() {
                   Tap to enter portal
                 </div>
               </div>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <path d="M9 18l6-6-6-6" />
               </svg>
             </button>

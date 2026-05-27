@@ -190,7 +190,7 @@ export default function AdminPanel({ branch, staffList, setStaffList, api, refre
           <button className="btn-sm" style={{ background: '#10b981', minHeight: 'var(--touch-min)' }} onClick={() => openRegModal()}>
             + Register
           </button>
-          <button className="btn-sm" style={{ background: '#06b6d4', minHeight: 'var(--touch-min)' }} onClick={loadAdminData}>
+          <button className="btn-sm" style={{ background: 'var(--accent)', minHeight: 'var(--touch-min)' }} onClick={loadAdminData}>
             ↻ Refresh
           </button>
         </div>
@@ -214,7 +214,7 @@ export default function AdminPanel({ branch, staffList, setStaffList, api, refre
                       <td className="admin-staff-actions">
                         <button
                           className="btn-sm"
-                          style={{ background: '#06b6d4', padding: '6px 12px', marginRight: 4, minHeight: 'var(--touch-min)' }}
+                          style={{ background: 'var(--accent)', padding: '6px 12px', marginRight: 4, minHeight: 'var(--touch-min)' }}
                           onClick={() => openRegModal(s)}
                         >
                           Edit
@@ -348,7 +348,7 @@ export default function AdminPanel({ branch, staffList, setStaffList, api, refre
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 4 }}>
           <small style={{ opacity: 0.5, fontSize: 'clamp(0.5rem, 1.2vw, 0.6rem)' }}>Track of all admin actions</small>
-          <button className="btn-sm" style={{ background: '#06b6d4', padding: '6px 12px', minHeight: 'var(--touch-min)' }} onClick={loadAuditLogs}>
+          <button className="btn-sm" style={{ background: 'var(--accent)', padding: '6px 12px', minHeight: 'var(--touch-min)' }} onClick={loadAuditLogs}>
             ↻ Refresh
           </button>
         </div>
@@ -372,7 +372,7 @@ export default function AdminPanel({ branch, staffList, setStaffList, api, refre
       {/* Staff Registration Modal */}
       <div className={`modal-overlay ${regModal.visible ? 'show' : ''}`} onClick={() => setRegModal({ ...regModal, visible: false })}>
         <div className="modal-body" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-          <h3 style={{ marginTop: 0, color: '#06b6d4', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
+          <h3 style={{ marginTop: 0, color: 'var(--accent)', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>
             {regModal.editId ? 'EDIT STAFF' : 'STAFF REGISTRATION'}
           </h3>
           <label>STAFF NAME</label>

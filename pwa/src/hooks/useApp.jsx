@@ -83,7 +83,7 @@ export function AppProvider({ children }) {
       {children}
       {loadingMsg && (
         <div className="loading-overlay show">
-          <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: '#06b6d4', borderBottomColor: 'transparent' }} />
+          <div className="loader" style={{ width: 24, height: 24, borderWidth: 3, borderColor: 'var(--accent)', borderBottomColor: 'transparent' }} />
           <span>{loadingMsg}</span>
         </div>
       )}
