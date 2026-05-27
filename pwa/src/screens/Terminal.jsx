@@ -6,21 +6,29 @@ export default function Terminal({ branch, staffList, api, selectedStaff, setSel
   const { showToast, showLoading, hideLoading, isManager } = useApp();
   const [selectedDate, setSelectedDate] = useState(getCurrentDate());
   const [processing, setProcessing] = useState(false);
+  const [showSplitDuty, setShowSplitDuty] = useState(false);
+  const [processing2, setProcessing2] = useState(false);
 
-  async function handlePunch(type) {
+  async function handlePunch(type, segment = 1) {
     if (!selectedStaff) return showToast('Select Staff Name!', true);
     if (!selectedDate) return showToast('Select Date!', true);
 
-    setProcessing(true);
-    showLoading('Processing...');
+    const isSeg2 = segment === 2;
+    setProcessing(!isSeg2);
+    setProcessing2(isSeg2);
+
+    const label = isSeg2 ? 'Segment 2' : '';
+    showLoading(`Processing ${label}...`);
 
     try {
-      await api.processAttendance(selectedStaff.id, selectedStaff.name, type, selectedDate);
-      showToast(`${type === 'START SHIFT' ? 'CHECK IN' : 'CHECK OUT'} recorded for ${selectedStaff.name}`);
+      await api.processAttendance(selectedStaff.id, selectedStaff.name, type, selectedDate, segment);
+      const prefix = isSeg2 ? 'Seg 2 ' : '';
+      showToast(`✅ ${prefix}${type === 'START SHIFT' ? 'CHECK IN' : 'CHECK OUT'} — ${selectedStaff.name}`);
     } catch (err) {
       showToast('Error: ' + err.message, true);
     } finally {
       setProcessing(false);
+      setProcessing2(false);
       hideLoading();
     }
   }
@@ -76,22 +84,93 @@ export default function Terminal({ branch, staffList, api, selectedStaff, setSel
           onChange={e => setSelectedDate(e.target.value)}
         />
 
-        <div className="grid-2" style={{ marginTop: 'clamp(16px, 3vw, 20px)', gap: 'clamp(8px, 2vw, 12px)' }}>
-          <button
-            className="btn-primary green terminal-punch-btn"
-            onClick={() => handlePunch('START SHIFT')}
-            disabled={processing}
-          >
-            {processing ? '⏳' : '▶'} {processing ? 'PROCESSING...' : 'CHECK IN'}
-          </button>
-          <button
-            className="btn-primary red terminal-punch-btn"
-            onClick={() => handlePunch('END SHIFT')}
-            disabled={processing}
-          >
-            {processing ? '⏳' : '■'} {processing ? 'PROCESSING...' : 'CHECK OUT'}
-          </button>
+        {/* Segment 1 — Main Shift */}
+        <div style={{ marginTop: 'clamp(16px, 3vw, 20px)' }}>
+          <small style={{ fontSize: '0.55rem', opacity: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8, display: 'block' }}>
+            Shift 1
+          </small>
+          <div className="grid-2" style={{ gap: 'clamp(8px, 2vw, 12px)' }}>
+            <button
+              className="btn-primary green terminal-punch-btn"
+              onClick={() => handlePunch('START SHIFT', 1)}
+              disabled={processing || processing2}
+            >
+              {processing && !processing2 ? '⏳' : '▶'} {processing && !processing2 ? '...' : 'LOGIN 1'}
+            </button>
+            <button
+              className="btn-primary red terminal-punch-btn"
+              onClick={() => handlePunch('END SHIFT', 1)}
+              disabled={processing || processing2}
+            >
+              {processing && !processing2 ? '⏳' : '■'} {processing && !processing2 ? '...' : 'LOGOUT 1'}
+            </button>
+          </div>
         </div>
+
+        {/* Split Duty Toggle */}
+        <button
+          onClick={() => setShowSplitDuty(!showSplitDuty)}
+          style={{
+            marginTop: 'clamp(12px, 2vw, 16px)',
+            width: '100%',
+            padding: 'clamp(10px, 2vw, 14px)',
+            borderRadius: 'var(--radius-md)',
+            background: showSplitDuty ? 'var(--accent-dim)' : 'transparent',
+            border: `1px dashed ${showSplitDuty ? 'var(--accent)' : 'var(--border-color)'}`,
+            color: 'var(--accent)',
+            fontFamily: 'inherit',
+            fontWeight: 700,
+            fontSize: 'clamp(0.65rem, 1.3vw, 0.75rem)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>{showSplitDuty ? '⊟' : '⊞'}</span>
+          {showSplitDuty ? 'HIDE SPLIT DUTY' : 'ADD SPLIT DUTY'}
+        </button>
+
+        {/* Segment 2 — Split Duty */}
+        {showSplitDuty && (
+          <div style={{
+            marginTop: 'clamp(12px, 2vw, 16px)',
+            padding: 'clamp(14px, 2vw, 18px)',
+            background: 'var(--bg-elevated)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-color)',
+            animation: 'slideUp 0.2s ease',
+          }}>
+            <small style={{ fontSize: '0.55rem', opacity: 0.6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8, display: 'block' }}>
+              Shift 2 <span style={{ color: 'var(--accent)', fontWeight: 800 }}>(Split Duty)</span>
+            </small>
+            <div className="grid-2" style={{ gap: 'clamp(8px, 2vw, 12px)' }}>
+              <button
+                className="btn-primary green terminal-punch-btn"
+                onClick={() => handlePunch('START SHIFT', 2)}
+                disabled={processing || processing2}
+                style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)' }}
+              >
+                {processing2 ? '⏳' : '▶'} {processing2 ? '...' : 'LOGIN 2'}
+              </button>
+              <button
+                className="btn-primary red terminal-punch-btn"
+                onClick={() => handlePunch('END SHIFT', 2)}
+                disabled={processing || processing2}
+                style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)' }}
+              >
+                {processing2 ? '⏳' : '■'} {processing2 ? '...' : 'LOGOUT 2'}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.5rem', opacity: 0.4, marginTop: 8, textAlign: 'center' }}>
+              Use for split shifts (e.g., morning + evening). Both segments calculate independently with midnight-crossing support.
+            </p>
+          </div>
+        )}
       </div>
 
       {!isManager && hasStaff && (

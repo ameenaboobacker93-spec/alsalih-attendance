@@ -16,10 +16,12 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Fix modal state — track which entries need fixing
-  const [fixModal, setFixModal] = useState({ visible: false, date: '', staffId: null, staffName: '', currentIn: '', currentOut: '' });
+  // Fix modal state — track which entries need fixing (both segments)
+  const [fixModal, setFixModal] = useState({ visible: false, date: '', staffId: null, staffName: '', currentIn: '', currentOut: '', currentIn2: '', currentOut2: '' });
   const [fixIn, setFixIn] = useState('');
   const [fixOut, setFixOut] = useState('');
+  const [fixIn2, setFixIn2] = useState('');
+  const [fixOut2, setFixOut2] = useState('');
 
   // Summary modal
   const [showSummary, setShowSummary] = useState(false);
@@ -50,9 +52,13 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   function openFix(log) {
     const currentIn = log.checkIn ? new Date(log.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
     const currentOut = log.checkOut ? new Date(log.checkOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
-    setFixModal({ visible: true, date: log.date, staffId: selectedStaff.id, staffName: selectedStaff.name, currentIn, currentOut });
+    const currentIn2 = log.checkIn2 ? new Date(log.checkIn2).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    const currentOut2 = log.checkOut2 ? new Date(log.checkOut2).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    setFixModal({ visible: true, date: log.date, staffId: selectedStaff.id, staffName: selectedStaff.name, currentIn, currentOut, currentIn2, currentOut2 });
     setFixIn('');
     setFixOut('');
+    setFixIn2('');
+    setFixOut2('');
   }
 
   async function saveFix() {
@@ -61,8 +67,10 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
         fixModal.staffId,
         fixModal.staffName,
         fixModal.date,
-        fixIn,
-        fixOut
+        fixIn || null,
+        fixOut || null,
+        fixIn2 || null,
+        fixOut2 || null
       );
       showToast('Entry fixed successfully');
       setFixModal({ ...fixModal, visible: false });
@@ -72,14 +80,20 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
     }
   }
 
+  // Helper: calc hours for one segment with midnight crossing support
+  function calcSegHours(inTime, outTime) {
+    if (!inTime || !outTime) return 0;
+    const diff = (new Date(outTime) - new Date(inTime)) / (1000 * 60 * 60);
+    return ((diff % 24) + 24) % 24 || 0;
+  }
+
   // ── Approve OT ──
   async function handleApproveOT(log) {
     showLoading('Approving OT...');
     try {
-      const checkIn = new Date(log.checkIn);
-      const checkOut = new Date(log.checkOut);
-      const diff = (checkOut - checkIn) / (1000 * 60 * 60);
-      const actualHours = diff < 0 ? diff + 24 : diff;
+      const seg1 = calcSegHours(log.checkIn, log.checkOut);
+      const seg2 = calcSegHours(log.checkIn2, log.checkOut2);
+      const actualHours = seg1 + seg2;
       const dutyHrs = selectedStaff?.duty_hours || 9;
       const otHours = Math.max(0, actualHours - dutyHrs);
 
@@ -97,10 +111,9 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
   async function handleRejectOT(log) {
     showLoading('Rejecting OT...');
     try {
-      const checkIn = new Date(log.checkIn);
-      const checkOut = new Date(log.checkOut);
-      const diff = (checkOut - checkIn) / (1000 * 60 * 60);
-      const actualHours = diff < 0 ? diff + 24 : diff;
+      const seg1 = calcSegHours(log.checkIn, log.checkOut);
+      const seg2 = calcSegHours(log.checkIn2, log.checkOut2);
+      const actualHours = seg1 + seg2;
 
       await api.rejectOT(selectedStaff.id, selectedStaff.name, log.date, actualHours.toFixed(2));
       showToast('✗ OT rejected');
@@ -368,28 +381,56 @@ export default function Dashboard({ branch, staffList, api, isManager, refreshKe
             </div>
           </div>
 
-      {/* Fix Modal — edit only the missing entry (check-in OR check-out) */}
+      {/* Fix Modal — edit entries for both segments */}
       <div className={`modal-overlay ${fixModal.visible ? 'show' : ''}`} onClick={() => setFixModal({ ...fixModal, visible: false })}>
         <div className="modal-body" onClick={e => e.stopPropagation()}>
           <h3 style={{ marginTop: 0, color: 'var(--accent)', fontSize: 'clamp(0.95rem, 2.5vw, 1.1rem)' }}>Fix Entry — {fixModal.date}</h3>
           <p style={{ fontSize: '0.65rem', opacity: 0.6, marginBottom: 16 }}>
-            Fill in only the missing field. The other field will remain unchanged.
+            Fill in any fields you want to set. Empty fields will remain unchanged.
           </p>
-          <label>Check In <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentIn || 'missing'})</span></label>
+
+          {/* Segment 1 */}
+          <small style={{ fontSize: '0.5rem', opacity: 0.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 6, display: 'block' }}>
+            Shift 1
+          </small>
+          <label>Check In <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentIn || '—'})</span></label>
           <input
             type="time"
             value={fixIn}
             onChange={e => setFixIn(e.target.value)}
-            placeholder={fixModal.currentIn || 'Enter check-in time'}
           />
-          <label style={{ marginTop: 12 }}>Check Out <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentOut || 'missing'})</span></label>
+          <label style={{ marginTop: 8 }}>Check Out <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentOut || '—'})</span></label>
           <input
             type="time"
             value={fixOut}
             onChange={e => setFixOut(e.target.value)}
-            placeholder={fixModal.currentOut || 'Enter check-out time'}
-            style={{ marginTop: 4 }}
           />
+
+          {/* Segment 2 */}
+          <div style={{
+            marginTop: 16,
+            padding: '12px 14px',
+            background: 'var(--accent-dim)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-accent)',
+          }}>
+            <small style={{ fontSize: '0.5rem', opacity: 0.7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8, display: 'block', color: 'var(--accent)' }}>
+              Shift 2 (Split Duty)
+            </small>
+            <label>Check In 2 <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentIn2 || '—'})</span></label>
+            <input
+              type="time"
+              value={fixIn2}
+              onChange={e => setFixIn2(e.target.value)}
+            />
+            <label style={{ marginTop: 8 }}>Check Out 2 <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none' }}>(current: {fixModal.currentOut2 || '—'})</span></label>
+            <input
+              type="time"
+              value={fixOut2}
+              onChange={e => setFixOut2(e.target.value)}
+            />
+          </div>
+
           <div className="grid-2" style={{ marginTop: 16, gap: 8 }}>
             <button className="btn-primary slate" style={{ padding: 12 }} onClick={() => setFixModal({ ...fixModal, visible: false })}>
               CANCEL

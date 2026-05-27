@@ -45,7 +45,8 @@ export function getCurrentMonth() {
 export function calcHours(checkIn, checkOut) {
   if (!checkIn || !checkOut) return 0;
   const diff = (new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60);
-  return diff < 0 ? diff + 24 : diff;
+  // Normalize to [0, 24) range for single-shift calculations
+  return ((diff % 24) + 24) % 24 || 0;
 }
 
 export function generateCSV(rows, headers) {

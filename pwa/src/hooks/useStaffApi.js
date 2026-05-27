@@ -87,14 +87,18 @@ export function useStaffApi(branchId) {
   }
 
   // ── Attendance (upsert — checks for existing entry on same date) ──
-  async function processAttendance(staffId, staffName, type, dateStr) {
+  async function processAttendance(staffId, staffName, type, dateStr, segment = 1) {
     const now = new Date();
     const dateKey = dateStr;
+
+    // Determine which field pair to use based on segment
+    const checkInField = segment === 2 ? 'check_in_2' : 'check_in';
+    const checkOutField = segment === 2 ? 'check_out_2' : 'check_out';
 
     // Check if entry exists for this staff + date
     const { data: existing, error: queryErr } = await supabase
       .from('attendance_logs')
-      .select('id, check_in, check_out, status')
+      .select('id, check_in, check_out, check_in_2, check_out_2, status')
       .eq('staff_id', staffId)
       .eq('date', dateKey)
       .order('created_at', { ascending: false })
@@ -103,60 +107,70 @@ export function useStaffApi(branchId) {
     if (queryErr) throw queryErr;
 
     const hasExisting = existing && existing.length > 0;
+    const existingEntry = hasExisting ? existing[0] : null;
 
     if (type === 'START SHIFT') {
       if (hasExisting) {
-        // Lock first check-in — don't overwrite if already set
-        if (existing[0].check_in) {
-          throw new Error('Already checked in today');
+        // Lock — don't overwrite if already set for this segment
+        if (existingEntry[checkInField]) {
+          const label = segment === 2 ? 'Segment 2' : '';
+          throw new Error(`Already checked in ${label}`.trim());
         }
+        const updateObj = {};
+        updateObj[checkInField] = now;
+        if (segment === 1) updateObj.status = 'INCOMPLETE';
         const { error: updErr } = await supabase
           .from('attendance_logs')
-          .update({ check_in: now, status: 'INCOMPLETE' })
-          .eq('id', existing[0].id);
+          .update(updateObj)
+          .eq('id', existingEntry.id);
         if (updErr) throw updErr;
       } else {
         // Create new entry
+        const insertObj = {
+          staff_id: staffId,
+          branch_id: branchId,
+          date: dateKey,
+          status: 'INCOMPLETE',
+        };
+        insertObj[checkInField] = now;
         const { error: insErr } = await supabase
           .from('attendance_logs')
-          .insert({
-            staff_id: staffId,
-            branch_id: branchId,
-            date: dateKey,
-            check_in: now,
-            status: 'INCOMPLETE',
-          });
+          .insert(insertObj);
         if (insErr) throw insErr;
       }
     } else {
       // END SHIFT
       if (hasExisting) {
-        // Lock first check-out — don't overwrite if already set
-        if (existing[0].check_out) {
-          throw new Error('Already checked out today');
+        // Lock — don't overwrite if already set for this segment
+        if (existingEntry[checkOutField]) {
+          const label = segment === 2 ? 'Segment 2' : '';
+          throw new Error(`Already checked out ${label}`.trim());
         }
+        const updateObj = {};
+        updateObj[checkOutField] = now;
         const { error: updErr } = await supabase
           .from('attendance_logs')
-          .update({ check_out: now })
-          .eq('id', existing[0].id);
+          .update(updateObj)
+          .eq('id', existingEntry.id);
         if (updErr) throw updErr;
       } else {
-        // Create new entry with check-out only
+        const insertObj = {
+          staff_id: staffId,
+          branch_id: branchId,
+          date: dateKey,
+          status: 'INCOMPLETE',
+        };
+        insertObj[checkOutField] = now;
         const { error: insErr } = await supabase
           .from('attendance_logs')
-          .insert({
-            staff_id: staffId,
-            branch_id: branchId,
-            date: dateKey,
-            check_out: now,
-            status: 'INCOMPLETE',
-          });
+          .insert(insertObj);
         if (insErr) throw insErr;
       }
     }
 
     // Log audit
-    await logAudit(staffName, 'ATTENDANCE', `${type} recorded for ${staffName}`);
+    const segLabel = segment === 2 ? ' (Seg 2)' : '';
+    await logAudit(staffName, 'ATTENDANCE', `${type} recorded for ${staffName}${segLabel}`);
 
     return type === 'START SHIFT' ? 'CHECK IN' : 'CHECK OUT';
   }
@@ -315,48 +329,68 @@ export function useStaffApi(branchId) {
 
       const checkIn = log?.check_in ? new Date(log.check_in) : null;
       const checkOut = log?.check_out ? new Date(log.check_out) : null;
+      const checkIn2 = log?.check_in_2 ? new Date(log.check_in_2) : null;
+      const checkOut2 = log?.check_out_2 ? new Date(log.check_out_2) : null;
       let otVal = 0;
       let status = '';
       let totalHours = '';
+      const isSplit = !!checkIn2 || !!checkOut2;
 
+      // Helper to calc hours for one segment (handles midnight crossing)
+      function segHours(inTime, outTime) {
+        if (!inTime || !outTime) return null;
+        const diff = (outTime - inTime) / (1000 * 60 * 60);
+        return ((diff % 24) + 24) % 24 || 0;
+      }
+
+      const seg1 = segHours(checkIn, checkOut);
+      const seg2 = segHours(checkIn2, checkOut2);
+
+      // Determine status
       // Off day: only when roster explicitly marks as off day AND no entries exist
-      if (rosterEntry?.is_off_day && !checkIn && !checkOut) {
+      if (rosterEntry?.is_off_day && !checkIn && !checkOut && !checkIn2 && !checkOut2) {
         status = 'OFF_DAY';
         offCount++;
-      } else if (!checkIn && !checkOut) {
+      } else if (!checkIn && !checkOut && !checkIn2 && !checkOut2) {
         status = 'MISSING';
-      } else if (!checkIn || !checkOut) {
+      } else if (seg1 === null && seg2 === null && (checkIn || checkIn2 || checkOut || checkOut2)) {
+        // Has some entries but neither segment is complete
         status = 'INCOMPLETE';
-      } else {
-        const diff = (checkOut - checkIn) / (1000 * 60 * 60);
-        const actualHours = diff < 0 ? diff + 24 : diff;
+      } else if ((seg1 !== null && seg1 >= 0) || (seg2 !== null && seg2 >= 0)) {
+        // At least one segment is complete — calculate total
+        const total = (seg1 || 0) + (seg2 || 0);
 
         if (otAdj && otAdj.ot_value != null) {
           otVal = parseFloat(otAdj.ot_value);
-          // Check the status field for approved vs rejected
           if (otAdj.status === 'Rejected') {
             status = 'OT_REJECTED';
           } else if (otVal > 0) {
             status = 'OT_APPROVED';
             calcOt += otVal;
           } else {
-            // Verified but ot_value is 0 — treat as normal/compensated
-            status = actualHours < dutyHrs ? 'COMPENSATED' : 'NORMAL';
+            status = total < dutyHrs ? 'COMPENSATED' : 'NORMAL';
           }
-        } else if (actualHours > dutyHrs) {
-          // OT: when staff works more than their duty hours
-          otVal = actualHours - dutyHrs;
+        } else if (total > dutyHrs) {
+          otVal = total - dutyHrs;
           status = 'PENDING_APPROVAL';
-        } else if (actualHours < dutyHrs) {
-          // Reduced hours — show as compensated
+        } else if (total < dutyHrs) {
           status = 'COMPENSATED';
         } else {
-          // Exactly duty hours — normal
           status = 'NORMAL';
         }
 
-        // Format total hours for display
-        totalHours = actualHours.toFixed(2).replace(/\.?0+$/, '');
+        totalHours = total.toFixed(2).replace(/\.?0+$/, '');
+      } else {
+        status = 'INCOMPLETE';
+      }
+
+      // Build shift display string
+      function fmtTime(d) {
+        return d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '---';
+      }
+      let shiftStr = fmtTime(checkIn) + ' - ' + fmtTime(checkOut);
+      if (isSplit) {
+        shiftStr += ' ⤵ ' + fmtTime(checkIn2) + ' - ' + fmtTime(checkOut2);
       }
 
       dailyLogs.push({
@@ -365,14 +399,14 @@ export function useStaffApi(branchId) {
         displayDate,
         checkIn: checkIn ? checkIn.toISOString() : null,
         checkOut: checkOut ? checkOut.toISOString() : null,
-        shift: (checkIn ? checkIn.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '---') +
-               ' - ' +
-               (checkOut ? checkOut.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '---'),
+        checkIn2: checkIn2 ? checkIn2.toISOString() : null,
+        checkOut2: checkOut2 ? checkOut2.toISOString() : null,
+        isSplit,
+        shift: shiftStr,
         totalHours,
         otValue: otVal.toFixed(2),
         status,
         hasRoster: !!rosterEntry,
-        isSplit: rosterEntry?.is_split || false,
       });
     }
 
@@ -407,55 +441,74 @@ export function useStaffApi(branchId) {
     return true;
   }
 
+  // ── Helper: build checkout timestamp with midnight crossing detection ──
+  function buildCheckOutTimestamp(dateKey, checkInTimeStr, existingCheckInDate, checkOutTimeStr) {
+    const [h, min] = checkOutTimeStr.split(':').map(Number);
+    const outTotal = h * 60 + min;
+
+    let inTotal = null;
+    if (checkInTimeStr) {
+      const [inH, inMin] = checkInTimeStr.split(':').map(Number);
+      inTotal = inH * 60 + inMin;
+    } else if (existingCheckInDate) {
+      inTotal = existingCheckInDate.getHours() * 60 + existingCheckInDate.getMinutes();
+    }
+
+    if (inTotal !== null && outTotal < inTotal) {
+      const checkOutDate = new Date(dateKey + 'T' + checkOutTimeStr + ':00');
+      checkOutDate.setDate(checkOutDate.getDate() + 1);
+      return checkOutDate.toISOString();
+    }
+    return new Date(dateKey + 'T' + checkOutTimeStr + ':00').toISOString();
+  }
+
   // ── Manager Fix Entry (updates attendance_logs directly) ──
-  async function managerFixEntry(staffId, staffName, date, mIn, mOut) {
+  async function managerFixEntry(staffId, staffName, date, mIn, mOut, mIn2, mOut2) {
     const dateKey = date;
+
+    // Fetch existing record first — includes both segment fields
+    const { data: existingRecord } = await supabase
+      .from('attendance_logs')
+      .select('id, check_in, check_out, check_in_2, check_out_2')
+      .eq('staff_id', staffId)
+      .eq('date', dateKey)
+      .limit(1);
+
+    const hasExisting = existingRecord && existingRecord.length > 0;
+    const record = hasExisting ? existingRecord[0] : null;
+    const existingCheckIn = record?.check_in ? new Date(record.check_in) : null;
+    const existingCheckIn2 = record?.check_in_2 ? new Date(record.check_in_2) : null;
+    const existingRecordId = record?.id || null;
 
     // Build update object with only the fields that are provided
     const updates = {};
+
+    // Segment 1
     if (mIn) {
-      const [h, min] = mIn.split(':').map(Number);
       updates.check_in = new Date(dateKey + 'T' + mIn + ':00').toISOString();
     }
     if (mOut) {
-      const [h, min] = mOut.split(':').map(Number);
-      // If check-out time is before check-in time, it means the shift crosses midnight
-      // e.g., check-in at 15:00 and check-out at 03:00 means checkout is on the next day
-      if (mIn) {
-        const [inH, inMin] = mIn.split(':').map(Number);
-        const inTotal = inH * 60 + inMin;
-        const outTotal = h * 60 + min;
-        if (outTotal < inTotal) {
-          // Check-out is on the next day
-          const checkOutDate = new Date(dateKey + 'T' + mOut + ':00');
-          checkOutDate.setDate(checkOutDate.getDate() + 1);
-          updates.check_out = checkOutDate.toISOString();
-        } else {
-          updates.check_out = new Date(dateKey + 'T' + mOut + ':00').toISOString();
-        }
-      } else {
-        updates.check_out = new Date(dateKey + 'T' + mOut + ':00').toISOString();
-      }
+      updates.check_out = buildCheckOutTimestamp(dateKey, mIn, existingCheckIn, mOut);
+    }
+
+    // Segment 2
+    if (mIn2) {
+      updates.check_in_2 = new Date(dateKey + 'T' + mIn2 + ':00').toISOString();
+    }
+    if (mOut2) {
+      updates.check_out_2 = buildCheckOutTimestamp(dateKey, mIn2, existingCheckIn2, mOut2);
     }
 
     if (Object.keys(updates).length === 0) {
       throw new Error('No changes provided');
     }
-    const { data: existing } = await supabase
-      .from('attendance_logs')
-      .select('id')
-      .eq('staff_id', staffId)
-      .eq('date', dateKey)
-      .limit(1);
 
-    const hasExisting = existing && existing.length > 0;
-
-    if (hasExisting) {
+    if (existingRecordId) {
       // Update the existing entry with only the provided fields
       const { error } = await supabase
         .from('attendance_logs')
         .update(updates)
-        .eq('id', existing[0].id);
+        .eq('id', existingRecordId);
       if (error) throw error;
     } else {
       // Create a new entry with the provided fields
